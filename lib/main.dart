@@ -355,6 +355,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
   final ImagePicker _picker = ImagePicker();
   bool _acceptedTerms = false;
   bool _isSaving = false;
+  bool _isSaved = false; // current photo already uploaded to Supabase
   File? _selectedImage;
 
   bool get isRo => widget.currentLang == 'ro';
@@ -375,7 +376,10 @@ class _CaptureScreenState extends State<CaptureScreen> {
     );
 
     if (picked != null) {
-      setState(() => _selectedImage = File(picked.path));
+      setState(() {
+        _selectedImage = File(picked.path);
+        _isSaved = false;
+      });
     }
   }
 
@@ -412,7 +416,8 @@ class _CaptureScreenState extends State<CaptureScreen> {
           ? 'Poza a fost încărcată în burn_photos și salvată în baza de date!'
           : 'Photo uploaded to burn_photos and saved to database!');
 
-      setState(() => _selectedImage = null);
+      // Keep the photo so the user can still continue to the questions.
+      if (mounted) setState(() => _isSaved = true);
     } catch (e) {
       _showSnack(isRo
           ? 'Eroare la încărcare în Supabase: $e'
@@ -601,7 +606,10 @@ class _CaptureScreenState extends State<CaptureScreen> {
                     ),
                     onPressed: _isSaving
                         ? null
-                        : () => setState(() => _selectedImage = null),
+                        : () => setState(() {
+                              _selectedImage = null;
+                              _isSaved = false;
+                            }),
                   ),
                   const SizedBox(height: 10),
                   ElevatedButton.icon(
@@ -642,15 +650,17 @@ class _CaptureScreenState extends State<CaptureScreen> {
                               color: Colors.black,
                             ),
                           )
-                        : const Icon(Icons.cloud_upload),
+                        : Icon(_isSaved ? Icons.cloud_done : Icons.cloud_upload),
                     label: Text(
                       _isSaving
                           ? (isRo
                               ? 'Se încarcă în Supabase...'
                               : 'Uploading to Supabase...')
-                          : (isRo
-                              ? 'Salvează în Cloud'
-                              : 'Save to Cloud'),
+                          : _isSaved
+                              ? (isRo ? 'Salvat în Cloud' : 'Saved to Cloud')
+                              : (isRo
+                                  ? 'Salvează în Cloud'
+                                  : 'Save to Cloud'),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: accent,
@@ -662,7 +672,9 @@ class _CaptureScreenState extends State<CaptureScreen> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    onPressed: _isSaving ? null : _uploadToSupabaseStorageAndDb,
+                    onPressed: (_isSaving || _isSaved)
+                        ? null
+                        : _uploadToSupabaseStorageAndDb,
                   ),
                 ],
               ],
