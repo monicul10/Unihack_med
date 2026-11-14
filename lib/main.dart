@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 // ignore: deprecated_member_use
 import 'package:flutter/material.dart';
@@ -819,15 +820,28 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     final r = await OnnxBurnClassifierService().classifyImageFile(widget.imageFile);
     debugPrint('MODEL PROBABILITIES (softmax): ${r.probabilities}');
     BurnAssessment result;
+    String pct(List<double> p) =>
+        p.map((v) => '${(v * 100).toStringAsFixed(1)}%').join(' / ');
+    final watch = Stopwatch()..start();
+    debugPrint('[JEV] Sending request to Edge Function "burn-decision"...');
     try {
       final decided = await JevService().decide(
         visionProbs: r.probabilities,
         brightness: r.brightness,
         answers: widget.answers,
       );
+      debugPrint('[JEV] ✅ WORKS: answered in ${watch.elapsedMilliseconds} ms. '
+          'Grad I / II / III = ${pct(decided)}');
       result = fromJev(r.probabilities, decided, widget.answers);
     } catch (e) {
-      debugPrint('Jev unavailable, using local formula: $e');
+      final reason = switch (e) {
+        FunctionException(:final status, :final details) =>
+          'Edge Function returned HTTP $status: $details',
+        TimeoutException() => 'no answer within 25 s (timeout)',
+        _ => '${e.runtimeType}: $e',
+      };
+      debugPrint('[JEV] ❌ FAILED after ${watch.elapsedMilliseconds} ms: $reason');
+      debugPrint('[JEV] ⚠️ Using LOCAL FORMULA instead of Jev.');
       result = combine(r.probabilities, widget.answers);
     }
     _saveToHistory(result); // runs in the background; the result shows right away
