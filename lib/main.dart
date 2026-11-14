@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'assessment.dart';
 import 'classifier.dart';
@@ -904,6 +905,72 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     }
   }
 
+  /// Opens Google Maps (app if installed, otherwise browser) with a search for
+  /// hospitals. Google Maps uses the phone's location, so no permission is needed here.
+  Future<void> _openNearestHospital() async {
+    final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=hospital');
+    final opened = await launchUrl(url, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(isRo
+            ? 'Nu s-a putut deschide Google Maps.'
+            : 'Could not open Google Maps.'),
+      ));
+    }
+  }
+
+  Widget _hospitalMapCard(Color accent) {
+    const red = Color(0xFFFF6B6B);
+    return Material(
+      color: red.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: _openNearestHospital,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: red, width: 1.5),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: red.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.map_outlined, size: 32, color: red),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isRo ? 'Găsește cel mai apropiat spital' : 'Find nearest hospital',
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold, color: accent),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isRo ? 'Deschide în Google Maps' : 'Opens in Google Maps',
+                      style: TextStyle(
+                          fontSize: 12.5, color: accent.withValues(alpha: 0.75)),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.open_in_new, color: accent.withValues(alpha: 0.7)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Color _degreeColor(int degree) => switch (degree) {
         1 => Colors.green,
         2 => Colors.orange,
@@ -1090,6 +1157,10 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                           ],
                         ),
                       ),
+                    ],
+                    if (a.predictedDegree >= 2) ...[
+                      const SizedBox(height: 12),
+                      _hospitalMapCard(accent),
                     ],
                     const SizedBox(height: 16),
                     Container(
