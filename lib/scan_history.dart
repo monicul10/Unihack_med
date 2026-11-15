@@ -168,7 +168,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
               children: [
                 if (scans.isEmpty) message,
                 for (final s in scans)
-                  Container(
+                  GestureDetector(
+                    // Tap a scan to see its photo full screen.
+                    onTap: s.imageUrl == null ? null : () => _openPhoto(s),
+                    child: Container(
                     margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
@@ -185,10 +188,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             height: 76,
                             child: s.imageUrl == null
                                 ? _photoPlaceholder()
-                                : Image.network(
-                                    s.imageUrl!,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, _, _) => _photoPlaceholder(),
+                                : Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      Hero(
+                                        tag: s.imageUrl!,
+                                        child: Image.network(
+                                          s.imageUrl!,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, _, _) => _photoPlaceholder(),
+                                        ),
+                                      ),
+                                      const Positioned(
+                                        right: 4,
+                                        bottom: 4,
+                                        child: Icon(Icons.zoom_in,
+                                            size: 18, color: Colors.white,
+                                            shadows: [Shadow(blurRadius: 4)]),
+                                      ),
+                                    ],
                                   ),
                           ),
                         ),
@@ -198,13 +216,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                switch (s.degree) {
-                                  null => isRo ? 'Neanalizată' : 'Not analyzed',
-                                  0 => isRo ? 'Fără arsură' : 'No burn',
-                                  _ => isRo
-                                      ? 'Arsură Gradul ${s.degree}'
-                                      : 'Degree ${s.degree} Burn',
-                                },
+                                _label(s),
                                 style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
@@ -230,10 +242,37 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       ],
                     ),
                   ),
+                  ),
               ],
             ),
           );
         },
+      ),
+    );
+  }
+
+  String _label(ScanRecord s) => switch (s.degree) {
+        null => isRo ? 'Neanalizată' : 'Not analyzed',
+        0 => isRo ? 'Fără arsură' : 'No burn',
+        _ => isRo ? 'Arsură Gradul ${s.degree}' : 'Degree ${s.degree} Burn',
+      };
+
+  void _openPhoto(ScanRecord s) {
+    final details = [
+      if (s.probability != null)
+        '${isRo ? 'Încredere' : 'Confidence'}: ${(s.probability! * 100).toStringAsFixed(1)}%',
+      _date(s.createdAt),
+    ].join('  ·  ');
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _PhotoViewer(
+          url: s.imageUrl!,
+          title: _label(s),
+          subtitle: details,
+          titleColor: s.degree == null ? Colors.white : _degreeColor(s.degree),
+          errorText: isRo ? 'Poza nu a putut fi încărcată' : 'Could not load the photo',
+        ),
       ),
     );
   }
@@ -269,4 +308,98 @@ class _Message extends StatelessWidget {
           ],
         ),
       );
+}
+
+/// Full-screen photo from the history. Pinch to zoom (up to 5x), drag to move,
+/// double-tap to zoom in / reset.
+class _PhotoViewer extends StatefulWidget {
+  final String url, title, subtitle, errorText;
+  final Color titleColor;
+
+  const _PhotoViewer({
+    required this.url,
+    required this.title,
+    required this.subtitle,
+    required this.titleColor,
+    required this.errorText,
+  });
+
+  @override
+  State<_PhotoViewer> createState() => _PhotoViewerState();
+}
+
+class _PhotoViewerState extends State<_PhotoViewer> {
+  final _zoom = TransformationController();
+  TapDownDetails? _lastTap;
+
+  @override
+  void dispose() {
+    _zoom.dispose();
+    super.dispose();
+  }
+
+  void _toggleZoom() {
+    if (_zoom.value.getMaxScaleOnAxis() > 1.01) {
+      _zoom.value = Matrix4.identity();
+    } else if (_lastTap != null) {
+      const scale = 2.5;
+      final p = _lastTap!.localPosition;
+      _zoom.value = Matrix4.identity()
+        ..translateByDouble(-p.dx * (scale - 1), -p.dy * (scale - 1), 0, 1)
+        ..scaleByDouble(scale, scale, 1, 1);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.title,
+                style: TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold, color: widget.titleColor)),
+            Text(widget.subtitle,
+                style: const TextStyle(fontSize: 12, color: Colors.white70)),
+          ],
+        ),
+      ),
+      body: GestureDetector(
+        onDoubleTapDown: (d) => _lastTap = d,
+        onDoubleTap: _toggleZoom,
+        child: InteractiveViewer(
+          transformationController: _zoom,
+          minScale: 1,
+          maxScale: 5,
+          child: SizedBox.expand(
+            child: Hero(
+              tag: widget.url,
+              child: Image.network(
+                widget.url,
+                fit: BoxFit.contain,
+                loadingBuilder: (_, child, progress) => progress == null
+                    ? child
+                    : const Center(child: CircularProgressIndicator(color: Colors.white70)),
+                errorBuilder: (_, _, _) => Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.broken_image_outlined, size: 54, color: Colors.white54),
+                      const SizedBox(height: 10),
+                      Text(widget.errorText, style: const TextStyle(color: Colors.white70)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

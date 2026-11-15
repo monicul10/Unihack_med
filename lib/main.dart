@@ -50,7 +50,7 @@ class _DaVinciMedAppState extends State<DaVinciMedApp> {
     final accentColor = isDarkMode ? const Color(0xFFD8D7D3) : const Color(0xFF1C3826);
 
     return MaterialApp(
-      title: 'DaVinciMed',
+      title: 'CromerCare',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: isDarkMode ? Brightness.dark : Brightness.light,
@@ -190,7 +190,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 Icon(Icons.local_hospital, color: accent, size: 22),
                 const SizedBox(width: 8),
                 Text(
-                  'DaVinciMed',
+                  'CromerCare',
                   style: TextStyle(fontWeight: FontWeight.bold, color: accent),
                 ),
               ],
@@ -394,7 +394,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'DaVinciMed',
+          'CromerCare',
           style: TextStyle(fontWeight: FontWeight.bold, color: accent),
         ),
         actions: [

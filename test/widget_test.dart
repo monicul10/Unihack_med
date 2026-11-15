@@ -18,7 +18,7 @@ void main() {
     await tester.pumpWidget(const DaVinciMedApp());
     await tester.pump();
 
-    expect(find.text('DaVinciMed'), findsWidgets);
+    expect(find.text('CromerCare'), findsWidgets);
     expect(find.text('Autentificare Pacient'), findsOneWidget);
     expect(find.text('Email'), findsWidgets);
     expect(find.text('Conectare'), findsOneWidget);
