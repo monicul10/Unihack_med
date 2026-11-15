@@ -435,3 +435,9 @@ entrypoint = "./functions/burn-decision/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/burn-decision/*.html" ]
+
+[functions.burn-triage]
+enabled = true
+verify_jwt = false
+import_map = "./functions/burn-triage/deno.json"
+entrypoint = "./functions/burn-triage/index.ts"

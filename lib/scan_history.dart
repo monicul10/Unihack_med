@@ -4,12 +4,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'assessment.dart';
+import 'triage.dart';
 
 const _bucket = 'burn_photos';
 
-/// One row of the user's history. [degree] and [probability] are null for
-/// scans saved before results were stored ("Not analyzed").
+/// One row of the user's history. [degree] is 0 for "no burn" and 1–3 for a
+/// burn grade. [degree] and [probability] are null for scans saved before
+/// results were stored ("Not analyzed").
 class ScanRecord {
   final DateTime createdAt;
   final int? degree;
@@ -25,7 +26,7 @@ class ScanHistoryService {
   SupabaseClient get _db => Supabase.instance.client;
 
   /// Uploads the photo to `<user_id>/<timestamp>.<ext>` and stores the result.
-  Future<void> save(File image, BurnAssessment result) async {
+  Future<void> save(File image, TriageDecision result) async {
     final user = _db.auth.currentUser;
     if (user == null) throw Exception('Not logged in');
 
@@ -36,7 +37,7 @@ class ScanHistoryService {
     await _db.from('scans').insert({
       'user_id': user.id,
       'image_path': path,
-      'degree': result.predictedDegree,
+      'degree': result.degree, // 0 = no burn
       'probability': result.confidence,
     });
   }
@@ -106,6 +107,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Color _degreeColor(int? degree) => switch (degree) {
+        0 => const Color(0xFF58B97D),
         1 => Colors.green,
         2 => Colors.orange,
         3 => const Color(0xFFFF6B6B),
@@ -196,11 +198,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                s.degree == null
-                                    ? (isRo ? 'Neanalizată' : 'Not analyzed')
-                                    : (isRo
-                                        ? 'Arsură Gradul ${s.degree}'
-                                        : 'Degree ${s.degree} Burn'),
+                                switch (s.degree) {
+                                  null => isRo ? 'Neanalizată' : 'Not analyzed',
+                                  0 => isRo ? 'Fără arsură' : 'No burn',
+                                  _ => isRo
+                                      ? 'Arsură Gradul ${s.degree}'
+                                      : 'Degree ${s.degree} Burn',
+                                },
                                 style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
@@ -209,7 +213,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               if (s.probability != null) ...[
                                 const SizedBox(height: 3),
                                 Text(
-                                  '${isRo ? 'Probabilitate' : 'Probability'}: '
+                                  '${isRo ? 'Încredere' : 'Confidence'}: '
                                   '${(s.probability! * 100).toStringAsFixed(1)}%',
                                   style: TextStyle(fontSize: 13, color: accent),
                                 ),

@@ -6,11 +6,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'assessment.dart';
 import 'classifier.dart';
 import 'jev_service.dart';
 import 'questions.dart';
 import 'scan_history.dart';
+import 'triage.dart';
 
 // ÎNLOCUIEȘTE CU DATELE DIN PROIECTUL TĂU NOU SUPABASE (Project Settings > API):
 const String supabaseUrl = 'https://fzwiaeaspyvepblicmnd.supabase.co';
@@ -631,10 +631,10 @@ class QuestionsScreen extends StatefulWidget {
 }
 
 class _QuestionsScreenState extends State<QuestionsScreen> {
-  late final List<int?> _answers = List.filled(questions.length, null);
+  // Every question starts on its default answer (spec Section 1).
+  late final List<int> _answers = [for (final q in questions) q.defaultIndex];
 
   bool get isRo => widget.currentLang == 'ro';
-  int get _answered => _answers.where((a) => a != null).length;
 
   @override
   Widget build(BuildContext context) {
@@ -674,8 +674,8 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
                 const SizedBox(height: 14),
                 Text(
                   isRo
-                      ? 'Răspunde la toate întrebările ($_answered/${questions.length})'
-                      : 'Answer all questions ($_answered/${questions.length})',
+                      ? 'Verifică răspunsurile la cele ${questions.length} întrebări'
+                      : 'Check your answers to the ${questions.length} questions',
                   style: TextStyle(
                       fontSize: 16, fontWeight: FontWeight.bold, color: accent),
                 ),
@@ -687,16 +687,12 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
                     decoration: BoxDecoration(
                       color: cardBg,
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                          color: _answers[i] == null
-                              ? medicalGreen.withValues(alpha: 0.4)
-                              : medicalGreen,
-                          width: 1.5),
+                      border: Border.all(color: medicalGreen, width: 1.5),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('${i + 1}. ${questions[i].q(lang)}',
+                        Text(questions[i].q(lang),
                             style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
@@ -764,19 +760,17 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
                   ),
-                  onPressed: _answered < questions.length
-                      ? null
-                      : () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => AnalysisScreen(
-                                imageFile: widget.imageFile,
-                                answers: _answers.cast<int>(),
-                                isDarkMode: widget.isDarkMode,
-                                currentLang: widget.currentLang,
-                              ),
-                            ),
-                          ),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AnalysisScreen(
+                        imageFile: widget.imageFile,
+                        answers: List.of(_answers),
+                        isDarkMode: widget.isDarkMode,
+                        currentLang: widget.currentLang,
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -809,49 +803,65 @@ class AnalysisScreen extends StatefulWidget {
 }
 
 class _AnalysisScreenState extends State<AnalysisScreen> {
-  late final Future<BurnAssessment> _future = _run();
+  late final Future<TriageDecision> _future = _run();
 
   /// null = saving to history, true = saved, false = failed.
   bool? _saved;
 
   bool get isRo => widget.currentLang == 'ro';
 
-  Future<BurnAssessment> _run() async {
+  static const _red = Color(0xFFFF6B6B);
+  static const _amber = Color(0xFFD99B26);
+
+  Future<TriageDecision> _run() async {
     final r = await OnnxBurnClassifierService().classifyImageFile(widget.imageFile);
-    debugPrint('MODEL PROBABILITIES (softmax): ${r.probabilities}');
-    BurnAssessment result;
-    String pct(List<double> p) =>
-        p.map((v) => '${(v * 100).toStringAsFixed(1)}%').join(' / ');
+    final image = ImageModelOutput(r.probabilities, r.brightness);
+    debugPrint('MODEL PROBABILITIES (softmax): ${r.probabilities}, '
+        'brightness ${r.brightness.toStringAsFixed(1)}');
+
+    // Brightness gate (spec Section 2): reject the photo, don't call Jev.
+    if (image.lowBrightnessWarning) {
+      debugPrint('[JEV] Not called: photo too dark '
+          '(brightness ${r.brightness.toStringAsFixed(1)} < $lowBrightnessThreshold).');
+      throw PhotoTooDarkException(r.brightness);
+    }
+
+    final chestionar = chestionarFromAnswers(widget.answers);
     final watch = Stopwatch()..start();
-    debugPrint('[JEV] Sending request to Edge Function "burn-decision"...');
+    debugPrint('[JEV] Sending request to Edge Function "${JevService.functionName}"...');
+    TriageDecision d;
     try {
-      final decided = await JevService().decide(
-        visionProbs: r.probabilities,
-        brightness: r.brightness,
-        answers: widget.answers,
-      );
-      debugPrint('[JEV] ✅ WORKS: answered in ${watch.elapsedMilliseconds} ms. '
-          'Grad I / II / III = ${pct(decided)}');
-      result = fromJev(r.probabilities, decided, widget.answers);
+      final jev = await JevService().ask(image, chestionar);
+      d = decideWithJev(jev, chestionar, image);
+      debugPrint('[JEV] ✅ WORKS: answered in ${watch.elapsedMilliseconds} ms '
+          '(model ${jev.model}). Jev chose ${jev.choice}, '
+          'transfer probability ${jev.transferProbability}, '
+          'inconsistency ${jev.inconsistency}');
+    } on PhotoTooDarkException {
+      rethrow;
     } catch (e) {
       final reason = switch (e) {
-        FunctionException(:final status, :final details) =>
-          'Edge Function returned HTTP $status: $details',
-        TimeoutException() => 'no answer within 25 s (timeout)',
+        JevUnavailable(:final message) => message,
+        TimeoutException() => 'timeout: no answer within 25 s',
         _ => '${e.runtimeType}: $e',
       };
       debugPrint('[JEV] ❌ FAILED after ${watch.elapsedMilliseconds} ms: $reason');
-      debugPrint('[JEV] ⚠️ Using LOCAL FORMULA instead of Jev.');
-      result = combine(r.probabilities, widget.answers);
+      debugPrint('[JEV] ⚠️ Using FALLBACK rules (image model + questionnaire).');
+      d = decideFallback(chestionar, image, reason);
     }
-    _saveToHistory(result); // runs in the background; the result shows right away
-    return result;
+    debugPrint('[TRIAGE] status=${d.status}, class=${d.burnDegreeClassification}, '
+        'no_burn_overridden=${d.noBurnOverridden}, transfer=${d.requiresImmediateTransfer}, '
+        'recommendation=${d.recommendation}, false_positive=${d.falsePositiveReasons}, '
+        'support=${d.noBurnSupport.score}/${d.noBurnSupport.threshold}');
+
+    _saveToHistory(d); // runs in the background; the result shows right away
+    return d;
   }
 
   /// Saves the photo + result once per analysis. A failure doesn't hide the result.
-  Future<void> _saveToHistory(BurnAssessment result) async {
+  Future<void> _saveToHistory(TriageDecision d) async {
     try {
-      await ScanHistoryService().save(widget.imageFile, result);
+      await ScanHistoryService().save(widget.imageFile, d);
       if (mounted) setState(() => _saved = true);
     } catch (e) {
       debugPrint('Saving to history failed: $e');
@@ -859,33 +869,30 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     }
   }
 
-  Widget _saveStatus(Color accent) {
-    final (IconData icon, String text, Color color) = switch (_saved) {
-      null => (
-          Icons.cloud_upload_outlined,
-          isRo ? 'Se salvează în istoric...' : 'Saving to history...',
-          accent.withValues(alpha: 0.7),
-        ),
-      true => (
-          Icons.cloud_done_outlined,
-          isRo ? 'Salvat în istoric' : 'Saved to history',
-          const Color(0xFF58B97D),
-        ),
-      false => (
-          Icons.cloud_off_outlined,
-          isRo ? 'Nu s-a putut salva în istoric' : 'Could not save to history',
-          const Color(0xFFFF6B6B),
-        ),
-    };
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(width: 6),
-        Text(text, style: TextStyle(fontSize: 12.5, color: color)),
-      ],
-    );
-  }
+  // --- Texts ---------------------------------------------------------------------
+
+  String _classLabel(String key) => switch (key) {
+        noBurn => isRo ? 'Fără arsură' : 'No burn',
+        _ => isRo ? 'Arsură gradul ${degreeOf(key)}' : 'Degree ${degreeOf(key)} burn',
+      };
+
+  String _falsePositiveText(String code) => switch (code) {
+        'third_degree_short_exposure' => isRo
+            ? 'Gradul 3 este neobișnuit pentru o expunere sub 10 secunde la această cauză.'
+            : '3rd degree is unusual for under 10 seconds of exposure to this cause.',
+        'second_degree_short_exposure' => isRo
+            ? 'Gradul 2 este neobișnuit pentru o expunere sub 1 secundă.'
+            : '2nd degree is unusual for under 1 second of exposure.',
+        'sun_exposure_too_short' => isRo
+            ? 'Câteva secunde la soare nu provoacă de obicei o arsură.'
+            : "A few seconds of sun don't usually cause a burn.",
+        'answers_inconsistent_with_image' => isRo
+            ? 'Răspunsurile la chestionar nu se potrivesc cu imaginea.'
+            : "Your questionnaire answers don't match the photo.",
+        _ => code,
+      };
+
+  // --- Hospital map --------------------------------------------------------------
 
   /// Opens Google Maps (app if installed, otherwise browser) with a search for
   /// hospitals. Google Maps uses the phone's location, so no permission is needed here.
@@ -902,9 +909,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   }
 
   Widget _hospitalMapCard(Color accent) {
-    const red = Color(0xFFFF6B6B);
     return Material(
-      color: red.withValues(alpha: 0.12),
+      color: _red.withValues(alpha: 0.12),
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -913,7 +919,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: red, width: 1.5),
+            border: Border.all(color: _red, width: 1.5),
           ),
           child: Row(
             children: [
@@ -921,10 +927,10 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: red.withValues(alpha: 0.2),
+                  color: _red.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.map_outlined, size: 32, color: red),
+                child: const Icon(Icons.map_outlined, size: 32, color: _red),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -953,11 +959,42 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     );
   }
 
-  Color _degreeColor(int degree) => switch (degree) {
-        1 => Colors.green,
-        2 => Colors.orange,
-        _ => const Color(0xFFFF6B6B),
+  // --- Small widgets -------------------------------------------------------------
+
+  Color _classColor(String key) => switch (key) {
+        noBurn => const Color(0xFF58B97D),
+        firstDegree => Colors.green,
+        secondDegree => Colors.orange,
+        _ => _red,
       };
+
+  Widget _box({required Color color, required Widget child}) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.13),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color, width: 1.5),
+        ),
+        child: child,
+      );
+
+  Widget _iconText(IconData icon, Color color, String text, Color accent,
+          {bool bold = false}) =>
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text,
+                style: TextStyle(
+                    fontSize: 13,
+                    height: 1.35,
+                    fontWeight: bold ? FontWeight.w600 : FontWeight.normal,
+                    color: accent)),
+          ),
+        ],
+      );
 
   Widget _bar(String label, double prob, Color color, Color accent) => Padding(
         padding: const EdgeInsets.only(bottom: 10),
@@ -987,6 +1024,235 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         ),
       );
 
+  Widget _saveStatus(Color accent) {
+    final (IconData icon, String text, Color color) = switch (_saved) {
+      null => (
+          Icons.cloud_upload_outlined,
+          isRo ? 'Se salvează în istoric...' : 'Saving to history...',
+          accent.withValues(alpha: 0.7),
+        ),
+      true => (
+          Icons.cloud_done_outlined,
+          isRo ? 'Salvat în istoric' : 'Saved to history',
+          const Color(0xFF58B97D),
+        ),
+      false => (
+          Icons.cloud_off_outlined,
+          isRo ? 'Nu s-a putut salva în istoric' : 'Could not save to history',
+          _red,
+        ),
+    };
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 6),
+        Text(text, style: TextStyle(fontSize: 12.5, color: color)),
+      ],
+    );
+  }
+
+  Widget _errorView(Object? error, Color accent) {
+    final dark = error is PhotoTooDarkException;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(dark ? Icons.wb_twilight : Icons.error_outline, size: 54, color: _red),
+            const SizedBox(height: 12),
+            Text(
+                dark
+                    ? (isRo ? 'Imaginea este prea întunecată' : 'The photo is too dark')
+                    : (isRo ? 'Eroare la analiza modelului' : 'Model analysis error'),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: accent)),
+            const SizedBox(height: 8),
+            Text(
+                dark
+                    ? (isRo
+                        ? 'Fă poza din nou cu lumină mai bună sau cu bliț.'
+                        : 'Retake the photo with better lighting or flash.')
+                    : '$error',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: accent.withValues(alpha: 0.8))),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- Result ----------------------------------------------------------------------
+
+  List<Widget> _result(TriageDecision d, Color accent, Color cardBg) {
+    const medicalGreen = Color(0xFF3F895A);
+    final col = _classColor(d.burnDegreeClassification);
+    final small = TextStyle(fontSize: 12, color: accent.withValues(alpha: 0.7));
+    final recommendation =
+        (isRo ? indicatiiRo : indicatiiEn)[d.recommendation]!;
+    final recColor = switch (d.recommendation) {
+      goToHospital => _red,
+      nothingToDo => const Color(0xFF58B97D),
+      _ => Colors.orange,
+    };
+
+    return [
+      // Estimate
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: col.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: col, width: 2),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.check_circle_outline, size: 32, color: col),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${isRo ? 'Estimare' : 'Estimate'}: ${_classLabel(d.burnDegreeClassification)}',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: accent),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${isRo ? 'Încredere' : 'Confidence'}: ${(d.confidence * 100).toStringAsFixed(1)}%',
+                    style: TextStyle(fontSize: 13, color: accent.withValues(alpha: 0.8)),
+                  ),
+                  if (!d.isFallback && d.severityProbabilityScore != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      '${isRo ? 'Severitate' : 'Severity'}: '
+                      '${d.severityProbabilityScore!.toStringAsFixed(1)} / 5',
+                      style: TextStyle(fontSize: 13, color: accent.withValues(alpha: 0.8)),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+
+      // Notes about "no burn"
+      if (d.burnDegreeClassification == noBurn) ...[
+        const SizedBox(height: 10),
+        _iconText(Icons.info_outline, accent.withValues(alpha: 0.7),
+            isRo
+                ? 'Concluzie «fără arsură» bazată pe mai multe răspunsuri suspecte.'
+                : '“No burn” conclusion based on several suspicious answers.',
+            accent),
+      ],
+      if (d.noBurnOverrideReason == 'no_burn_contradicted_by_answers') ...[
+        const SizedBox(height: 10),
+        _iconText(Icons.info_outline, accent.withValues(alpha: 0.7),
+            isRo
+                ? 'Răspunsurile la chestionar indică o arsură, deci rezultatul «fără arsură» nu a fost acceptat.'
+                : 'Your questionnaire answers indicate a burn, so the “no burn” result was not accepted.',
+            accent),
+      ],
+
+      // Urgent transfer + map
+      if (d.requiresImmediateTransfer) ...[
+        const SizedBox(height: 12),
+        _box(
+          color: _red,
+          child: _iconText(
+              Icons.warning_amber_rounded,
+              _red,
+              isRo
+                  ? 'Transfer urgent necesar. Mergi la urgență sau sună la 112.'
+                  : 'Urgent transfer needed. Go to emergency care or call your emergency number.',
+              accent,
+              bold: true),
+        ),
+        const SizedBox(height: 12),
+        _hospitalMapCard(accent),
+      ],
+
+      // Possible false positive (shown above the recommendation)
+      if (d.possibleFalsePositive) ...[
+        const SizedBox(height: 12),
+        _box(
+          color: _amber,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _iconText(
+                  Icons.report_problem_outlined,
+                  _amber,
+                  isRo
+                      ? 'Atenție: rezultatul poate fi supraestimat față de răspunsurile la chestionar. Verificați cu un medic.'
+                      : 'Warning: the result may be overestimated compared with your questionnaire answers. Please check with a doctor.',
+                  accent,
+                  bold: true),
+              for (final code in d.falsePositiveReasons)
+                Padding(
+                  padding: const EdgeInsets.only(left: 34, top: 6),
+                  child: Text('• ${_falsePositiveText(code)}',
+                      style: TextStyle(fontSize: 12.5, color: accent)),
+                ),
+            ],
+          ),
+        ),
+      ],
+
+      // Recommendation
+      const SizedBox(height: 12),
+      _box(
+        color: recColor,
+        child: Text(recommendation,
+            style: TextStyle(fontSize: 13.5, height: 1.4, color: accent)),
+      ),
+
+      // Probabilities and decision source
+      const SizedBox(height: 16),
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: medicalGreen.withValues(alpha: 0.5), width: 1.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              d.isFallback
+                  ? (isRo ? 'Probabilități (model imagine)' : 'Probabilities (image model)')
+                  : (isRo ? 'Probabilități Jev (imagine + întrebări)' : 'Jev probabilities (image + questions)'),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: accent),
+            ),
+            const SizedBox(height: 14),
+            for (final k in [noBurn, ...burnClasses])
+              if (d.classificationProbabilities[k] != null)
+                _bar(_classLabel(k), d.classificationProbabilities[k]!, _classColor(k), accent),
+            const Divider(height: 24),
+            Text(
+              d.isFallback
+                  ? (isRo ? 'Decizie: reguli locale (Jev indisponibil)' : 'Decision: local rules (Jev unavailable)')
+                  : '${isRo ? 'Decizie' : 'Decision'}: Jev (${d.jevModel ?? 'jev'}) + ${isRo ? 'reguli' : 'rules'}',
+              style: small,
+            ),
+            if (d.isFallback && d.fallbackReason != null) ...[
+              const SizedBox(height: 4),
+              Text('${isRo ? 'Motiv' : 'Reason'}: ${d.fallbackReason}', style: small),
+            ],
+            const SizedBox(height: 6),
+            Text(
+              '${isRo ? 'Doar model imagine' : 'Image model only'}: '
+              '${d.image.probabilities.map((p) => '${(p * 100).toStringAsFixed(1)}%').join(' / ')}',
+              style: small,
+            ),
+          ],
+        ),
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final bgColor =
@@ -1006,7 +1272,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         iconTheme: IconThemeData(color: accent),
         elevation: 0,
       ),
-      body: FutureBuilder<BurnAssessment>(
+      body: FutureBuilder<TriageDecision>(
         future: _future,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
@@ -1022,43 +1288,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               ),
             );
           }
-          if (snap.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.error_outline,
-                        size: 54, color: Color(0xFFFF6B6B)),
-                    const SizedBox(height: 12),
-                    Text(
-                        snap.error is PhotoTooDarkException
-                            ? (isRo ? 'Poza este prea întunecată' : 'Photo is too dark')
-                            : (isRo ? 'Eroare la analiza modelului' : 'Model analysis error'),
-                        style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: accent)),
-                    const SizedBox(height: 8),
-                    Text(
-                        snap.error is PhotoTooDarkException
-                            ? (isRo
-                                ? 'Fă poza din nou cu lumină mai bună sau cu bliț.'
-                                : 'Retake the photo with better lighting or flash.')
-                            : '${snap.error}',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            fontSize: 13, color: accent.withValues(alpha: 0.8))),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          final a = snap.data!;
-          final col = _degreeColor(a.predictedDegree);
-          String g(int n) => isRo ? 'Arsură Grad $n' : 'Degree $n Burn';
+          if (snap.hasError) return _errorView(snap.error, accent);
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
@@ -1074,123 +1304,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                           height: 200, width: double.infinity, fit: BoxFit.cover),
                     ),
                     const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: col.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: col, width: 2),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.check_circle_outline, size: 32, color: col),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  isRo
-                                      ? 'Estimare: Arsură Gradul ${a.predictedDegree}'
-                                      : 'Estimate: Degree ${a.predictedDegree} Burn',
-                                  style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: accent),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${isRo ? 'Probabilitate' : 'Probability'}: ${(a.confidence * 100).toStringAsFixed(1)}%',
-                                  style: TextStyle(
-                                      fontSize: 13,
-                                      color: accent.withValues(alpha: 0.8)),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (a.urgent) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFF6B6B).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFFFF6B6B)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.warning_amber_rounded,
-                                color: Color(0xFFFF6B6B)),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                isRo
-                                    ? 'Răspunsurile tale indică un risc ridicat (zonă sensibilă, arsură chimică/electrică sau probabilitate mare de grad 3). Mergi la urgență sau sună la 112.'
-                                    : 'Your answers indicate a high-risk burn (sensitive area, chemical/electrical cause or high grade 3 probability). Go to emergency care or call your emergency number.',
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: accent),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    if (a.predictedDegree >= 2) ...[
-                      const SizedBox(height: 12),
-                      _hospitalMapCard(accent),
-                    ],
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: cardBg,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                            color: medicalGreen.withValues(alpha: 0.5), width: 1.5),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            isRo
-                                ? 'Probabilități finale (imagine + întrebări)'
-                                : 'Final probabilities (image + questions)',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                                color: accent),
-                          ),
-                          const SizedBox(height: 14),
-                          _bar(g(1), a.finalProbs[0], Colors.green, accent),
-                          _bar(g(2), a.finalProbs[1], Colors.orange, accent),
-                          _bar(g(3), a.finalProbs[2], const Color(0xFFFF6B6B), accent),
-                          const Divider(height: 24),
-                          Text(
-                            a.source == 'jev'
-                                ? (isRo
-                                    ? 'Decizie: model Jev (imagine + întrebări)'
-                                    : 'Decision: Jev model (image + questions)')
-                                : (isRo
-                                    ? 'Decizie: formulă locală (Jev indisponibil)'
-                                    : 'Decision: local formula (Jev unavailable)'),
-                            style: TextStyle(
-                                fontSize: 12, color: accent.withValues(alpha: 0.7)),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            '${isRo ? 'Doar model imagine' : 'Image model only'}: '
-                            '${a.modelProbs.map((p) => '${(p * 100).toStringAsFixed(1)}%').join(' / ')}',
-                            style: TextStyle(
-                                fontSize: 12, color: accent.withValues(alpha: 0.7)),
-                          ),
-                        ],
-                      ),
-                    ),
+                    ..._result(snap.data!, accent, cardBg),
                     const SizedBox(height: 12),
                     _saveStatus(accent),
                     const SizedBox(height: 14),
@@ -1199,24 +1313,20 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                           ? 'Atenție: Această analiză are caracter informativ și nu înlocuiește un diagnostic medical profesionist.'
                           : 'Notice: This analysis is informational and does not replace professional medical diagnosis.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                          fontSize: 12, color: accent.withValues(alpha: 0.65)),
+                      style: TextStyle(fontSize: 12, color: accent.withValues(alpha: 0.65)),
                     ),
                     const SizedBox(height: 18),
                     ElevatedButton.icon(
                       icon: const Icon(Icons.arrow_back),
                       label: Text(isRo ? 'Înapoi la captură' : 'Back to capture',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 16)),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: medicalGreen,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
-                      onPressed: () =>
-                          Navigator.popUntil(context, (route) => route.isFirst),
+                      onPressed: () => Navigator.popUntil(context, (route) => route.isFirst),
                     ),
                   ],
                 ),
