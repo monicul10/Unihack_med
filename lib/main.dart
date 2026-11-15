@@ -476,47 +476,19 @@ class _CaptureScreenState extends State<CaptureScreen> {
                     child: _selectedImage != null
                         ? Image.file(_selectedImage!, fit: BoxFit.cover)
                         : Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 160,
-                                  height: 160,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Colors.white70,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  child: const Icon(
-                                    Icons.camera_alt_outlined,
-                                    color: Colors.white54,
-                                    size: 48,
-                                  ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Text(
+                                isRo
+                                    ? 'Leziunea ta va fi afișată aici.'
+                                    : 'Your injury will be displayed here.',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white70,
                                 ),
-                                const SizedBox(height: 12),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: accent,
-                                    borderRadius: BorderRadius.circular(15),
-                                  ),
-                                  child: Text(
-                                    isRo
-                                        ? 'Poziționează leziunea aici'
-                                        : 'Position injury here',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: widget.isDarkMode
-                                          ? const Color(0xFF0E1C14)
-                                          : Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
                           ),
                   ),
