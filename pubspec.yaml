@@ -59,9 +59,14 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/icon/app_icon.jpeg"
-  adaptive_icon_background: "#0E1C14"
-  adaptive_icon_foreground: "assets/icon/app_icon.jpeg"
+  # Full square, no transparency (iOS and older Android round it themselves).
+  image_path: "assets/icon/app_icon.png"
+  # Android 8+: white hourglass on transparent, sized for the safe zone, on the logo's green.
+  adaptive_icon_background: "#0F2115"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+  adaptive_icon_foreground_inset: 0 # the PNG already has the safe-zone padding
+  remove_alpha_ios: true
+  # Source artwork: assets/icon/app_icon.jpeg
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
