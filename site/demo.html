@@ -667,6 +667,8 @@
     body:not(.light-mode) .recommendation.go_to_hospital { color: #ff8a80; }
     body:not(.light-mode) .recommendation.treat_at_home { color: #ffd54f; }
     body:not(.light-mode) .recommendation.nothing_to_do { color: #a5d6a7; }
+    .recommendation.see_doctor { border-color: #607d8b; background: rgba(96, 125, 139, 0.16); color: #37474f; }
+    body:not(.light-mode) .recommendation.see_doctor { color: #b0bec5; }
     .jev-section {
       background: var(--tint-bg);
       border: 1px solid var(--border-color);
@@ -1297,7 +1299,7 @@
 
   <script>
     // --- CLIENT DIAGNOSTICS (no devtools needed) ---
-    const APP_VERSION = "2026-11-14.15";
+    const APP_VERSION = "2026-11-15.2";
     const CLOG_MAX_EVENTS = 200;
     const CLOG_FLUSH_MS = 2000;
     const CLOG_MAX_MSG = 500;
@@ -1581,10 +1583,14 @@
         jevSeverityLabel: "Scor Severitate (0-5):",
         jevTransferLabel: "Transfer Urgent:",
         noBurnConclusion: "Concluzie «fără arsură» bazată pe mai multe răspunsuri suspecte.",
+        inconclusiveNote: "Încrederea este sub 50%, așa că rezultatul nu este sigur.",
+        answersContradictNote: "Răspunsurile (expunere sub 1 secundă, fără bășici, suprafață mică) nu se potrivesc cu o arsură, deci nu se poate da un răspuns concret.",
+        answersNoBurnNote: "Răspunsurile la chestionar indică faptul că nu este o arsură.",
         indicatii: {
           go_to_hospital: "RECOMANDARE: Prezintă-te de urgență la spital / medic.\n- Acoperă zona cu un pansament steril, curat, fără a aplica unguente sau gheață.\n- Solicită evaluare medicală imediată.",
           treat_at_home: "RECOMANDARE: Îngrijire și monitorizare la domiciliu.\n- Răcește zona cu apă călduță/rece (nu gheață) timp de 10-15 minute.\n- Aplică o cremă hidratantă/calmanta potrivită și monitorizează evoluția.",
-          nothing_to_do: "RECOMANDARE: Nu este necesară nicio intervenție.\n- Pielea nu prezintă semne care să necesite tratament; menține zona curată."
+          nothing_to_do: "RECOMANDARE: Nu este necesară nicio intervenție.\n- Pielea nu prezintă semne care să necesite tratament; menține zona curată.",
+          see_doctor: "RECOMANDARE: Nu se poate da un răspuns concret pe baza pozei.\n- Refă poza cu lumină bună, clară și de aproape.\n- Dacă există durere, roșeață sau bășici, consultă un medic."
         },
         emailPlaceholder: "nume@exemplu.ro",
         classNames: {
@@ -1592,6 +1598,7 @@
           "first_degree": "Arsură Gradul I",
           "second_degree": "Arsură Gradul II",
           "third_degree": "Arsură Gradul III",
+          "inconclusive": "Nu pot da un răspuns concret",
           "indeterminate": "Indeterminat / Revizuiți"
         }
       },
@@ -1709,10 +1716,14 @@
         jevSeverityLabel: "Severity Score (0-5):",
         jevTransferLabel: "Urgent Transfer:",
         noBurnConclusion: "\"No burn\" conclusion based on several suspicious answers.",
+        inconclusiveNote: "Confidence is below 50%, so the result is not reliable.",
+        answersContradictNote: "The answers (exposure under 1 second, no blisters, small area) do not match a burn, so no definite answer can be given.",
+        answersNoBurnNote: "The questionnaire answers indicate that this is not a burn.",
         indicatii: {
           go_to_hospital: "RECOMMENDATION: Go to the hospital / a doctor urgently.\n- Cover the area with a clean, sterile dressing, without applying ointments or ice.\n- Seek immediate medical evaluation.",
           treat_at_home: "RECOMMENDATION: Care and monitoring at home.\n- Cool the area with lukewarm/cool water (not ice) for 10-15 minutes.\n- Apply a suitable moisturizing/soothing cream and monitor how it evolves.",
-          nothing_to_do: "RECOMMENDATION: No intervention is needed.\n- The skin shows no signs that require treatment; keep the area clean."
+          nothing_to_do: "RECOMMENDATION: No intervention is needed.\n- The skin shows no signs that require treatment; keep the area clean.",
+          see_doctor: "RECOMMENDATION: No definite answer can be given from the photo.\n- Retake the photo in good, clear light and from close up.\n- If there is pain, redness or blisters, see a doctor."
         },
         emailPlaceholder: "name@example.com",
         classNames: {
@@ -1720,6 +1731,7 @@
           "first_degree": "1st Degree Burn",
           "second_degree": "2nd Degree Burn",
           "third_degree": "3rd Degree Burn",
+          "inconclusive": "No definite answer possible",
           "indeterminate": "Indeterminate / Review"
         }
       }
@@ -2987,7 +2999,13 @@
 
       // Explain a "no burn" conclusion (only when that is the final class)
       const noBurnNote = document.getElementById('noBurnNote');
-      if (jev.burn_degree_classification === 'no_burn') {
+      if (jev.inconclusive) {
+        noBurnNote.textContent = jev.inconclusive_reason === 'answers_contradict_image' ? t.answersContradictNote : t.inconclusiveNote;
+        noBurnNote.hidden = false;
+      } else if (jev.answers_override && jev.burn_degree_classification === 'no_burn') {
+        noBurnNote.textContent = t.answersNoBurnNote;
+        noBurnNote.hidden = false;
+      } else if (jev.burn_degree_classification === 'no_burn') {
         noBurnNote.textContent = t.noBurnConclusion;
         noBurnNote.hidden = false;
       } else {

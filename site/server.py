@@ -12,7 +12,7 @@ from jev_client import JevBurnEvaluatorClient
 from pathlib import Path
 from dotenv import load_dotenv
 
-APP_VERSION = "2026-11-14.15"
+APP_VERSION = "2026-11-15.2"
 CLIENT_LOG_MAX_BYTES = 32 * 1024
 CLIENT_LOG_MAX_MSG = 500
 CLIENT_LOG_MAX_EVENTS = 200

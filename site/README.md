@@ -222,6 +222,13 @@ The full specification is in `jev_client.py`.
 - **Urgent transfer**:
   - For a burn: Jev's transfer probability ≥ 0.5, 3rd degree, chemical/electrical cause, or "Da" for sensitive area, surface or blisters.
   - For "no burn": only a chemical/electrical cause and radiation burns ("Radiații (expunere raze UV/X)").
+- **Low confidence**: if the confidence shown (Jev's, or the image model's on fallback) is below 50%, the result is "Nu pot da un răspuns concret" (`inconclusive`), for burn grades and for "no burn" alike.
+  - Transfer stays required if there are red flags (3rd degree from the image, chemical/electrical cause, "Da" for sensitive area, surface or blisters), a radiation cause, or Jev's transfer probability ≥ 0.5.
+  - The recommendation is `see_doctor` (retake the photo, see a doctor if there is pain, redness or blisters) unless transfer applies.
+  - No false-positive warnings are shown.
+- **Answers contradict the image**: the image model has no healthy-skin class, so it always outputs a burn grade, even for a normal face. If the final grade is a burn, the cause is not chemical, electrical or radiation, exposure is "< 1 secundă", and the blisters and surface answers are "Nu", the burn grade is not trusted (`answers_override`, `answers_override_reason: answers_contradict_image`, `jev_original_classification` kept). This runs before the low-confidence check and also in the fallback.
+  - Pain "0–2" gives "no burn" (`nothing_to_do`); any other pain gives `inconclusive` with `inconclusive_reason: answers_contradict_image` (`see_doctor`). If the confidence is also below 50%, the reason stays `low_confidence`.
+  - Transfer only if the sensitive-area answer is "Da". The image-only 3rd degree flag and Jev's 3rd degree choice are ignored. No false-positive warnings are shown.
 - **False-positive warnings** (warning only, never changes the result):
   - 3rd degree with exposure under 10 s
   - 2nd degree with exposure under 1 s

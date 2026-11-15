@@ -55,7 +55,21 @@ INDICATII = {
         "RECOMANDARE: Nu este necesară nicio intervenție.\n"
         "- Pielea nu prezintă semne care să necesite tratament; menține zona curată."
     ),
+    "see_doctor": (
+        "RECOMANDARE: Nu se poate da un răspuns concret pe baza pozei.\n"
+        "- Refă poza cu lumină bună, clară și de aproape.\n"
+        "- Dacă există durere, roșeață sau bășici, consultă un medic."
+    ),
 }
+
+# Below this confidence (the number shown in the UI) no definite answer is given.
+MIN_CONFIDENCE_FOR_ANSWER = 0.5
+INCONCLUSIVE_CLASS = "inconclusive"
+INCONCLUSIVE_REASON = "low_confidence"
+# The image model has no healthy-skin class, so it always outputs a burn grade. If the
+# answers clearly contradict a burn, the image grade is not trusted (see _answers_contradict_burn).
+ANSWERS_CONTRADICT_REASON = "answers_contradict_image"
+ANSWERS_CONTRADICT_BURN_CLASSES = ("first_degree", "second_degree", "third_degree")
 
 
 # Questions 1 (cause) and 2 (exposure) are 20% more important than the others.
@@ -155,6 +169,39 @@ def _requires_transfer_without_burn(questionnaire: dict) -> bool:
         return True
     cause = _answer(questionnaire, _is_cause_key)
     return any(k in cause for k in RADIATION_CAUSE_KEYS)
+
+
+def _answers_contradict_burn(questionnaire: dict) -> bool:
+    """True if the answers rule out a burn: not chemical/electrical/radiation, exposure under
+    1 second, no blisters and a small surface. Used to distrust the image model's burn grade."""
+    q = questionnaire or {}
+    cause = _answer(q, _is_cause_key)
+    if not cause or _requires_transfer_without_burn(q):
+        return False
+    return (
+        _answer(q, _is_exposure_key) in EXPOSURE_BRIEF_VALUES
+        and _answer(q, _is_blisters_key) in NO_VALUES
+        and _answer(q, _is_size_key) in NO_VALUES
+    )
+
+
+def _answers_override(class_key, questionnaire: dict) -> str | None:
+    """Class replacing a burn grade that the answers contradict: "no_burn" if there is also
+    no pain, else "inconclusive". None if the rule does not apply."""
+    if class_key not in ANSWERS_CONTRADICT_BURN_CLASSES or not _answers_contradict_burn(questionnaire):
+        return None
+    if _answer(questionnaire, _is_pain_key) in tuple(v.lower() for v in PAIN_NONE_VALUES):
+        return "no_burn"
+    return INCONCLUSIVE_CLASS
+
+
+def _answers_override_transfer(class_key, questionnaire: dict) -> bool:
+    """Transfer for an overridden result. Ignores the image-only 3rd degree red flag and Jev's
+    third_degree choice; only a sensitive area ("Da") requires it (a Jev transfer probability
+    alone never does)."""
+    if class_key == "no_burn":
+        return _requires_transfer_without_burn(questionnaire)
+    return _is_yes(_answer(questionnaire, _is_sensitive_key))
 
 
 # Support codes that come from questionnaire answers (the rest are suspicion signals).
@@ -267,9 +314,39 @@ def _best_burn_class(probabilities, cnn_prediction: dict) -> str | None:
 def _recommendation_key(class_key, requires_transfer) -> str:
     if requires_transfer:
         return "go_to_hospital"
+    if class_key == INCONCLUSIVE_CLASS:
+        return "see_doctor"
     if class_key == "no_burn":
         return "nothing_to_do"
     return "treat_at_home"
+
+
+def _as_confidence(value) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    return v if v == v and v not in (float("inf"), float("-inf")) else None
+
+
+def _decision_confidence(jev_confidence, cnn_prediction: dict) -> float | None:
+    """The confidence the UI shows: Jev's if numeric, else the image model's."""
+    value = _as_confidence(jev_confidence)
+    if value is None:
+        value = _as_confidence((cnn_prediction or {}).get("confidence"))
+    if value is None:
+        value = _cnn_top_probability(cnn_prediction)
+    return value
+
+
+def _is_inconclusive(class_key, decision_confidence) -> bool:
+    return (
+        decision_confidence is not None
+        and decision_confidence < MIN_CONFIDENCE_FOR_ANSWER
+        and class_key in ("no_burn", "first_degree", "second_degree", "third_degree")
+    )
 
 
 def _is_yes(value) -> bool:
@@ -363,11 +440,46 @@ class JevBurnEvaluatorClient:
             requires_transfer = _requires_transfer_without_burn(questionnaire)
         else:
             requires_transfer = _red_flags(cnn_prediction, questionnaire)
+        decision_confidence = _decision_confidence(None, cnn_prediction)
+        original_class = class_key
+        answers_class = _answers_override(class_key, questionnaire)
+        answers_override = answers_class is not None
+        if answers_override:
+            class_key = answers_class
+            requires_transfer = _answers_override_transfer(class_key, questionnaire)
+            inconclusive = class_key == INCONCLUSIVE_CLASS
+            inconclusive_reason = None
+            if inconclusive:
+                # Low confidence stays the reason if it applies too.
+                inconclusive_reason = (
+                    INCONCLUSIVE_REASON
+                    if _is_inconclusive(original_class, decision_confidence)
+                    else ANSWERS_CONTRADICT_REASON
+                )
+        else:
+            inconclusive = _is_inconclusive(class_key, decision_confidence)
+            inconclusive_reason = INCONCLUSIVE_REASON if inconclusive else None
+            if inconclusive:
+                class_key = INCONCLUSIVE_CLASS
+                requires_transfer = (
+                    _red_flags(cnn_prediction, questionnaire)
+                    or _requires_transfer_without_burn(questionnaire)
+                )
         recommendation = _recommendation_key(class_key, requires_transfer)
-        fp = _false_positive_check(cnn_prediction, questionnaire, class_key)
+        fp = (
+            {"possible_false_positive": False, "false_positive_reasons": []}
+            if inconclusive or answers_override
+            else _false_positive_check(cnn_prediction, questionnaire, class_key)
+        )
         return {
             "status": "fallback",
             "burn_degree_classification": class_key or cnn_prediction.get("predicted_class"),
+            "decision_confidence": decision_confidence,
+            "inconclusive": inconclusive,
+            "inconclusive_reason": inconclusive_reason,
+            "inconclusive_original_classification": original_class if inconclusive else None,
+            "answers_override": answers_override,
+            "answers_override_reason": ANSWERS_CONTRADICT_REASON if answers_override else None,
             "severity_probability_score": cnn_prediction.get("confidence"),
             "requires_immediate_transfer": requires_transfer,
             "recommendation": recommendation,
@@ -417,7 +529,10 @@ class JevBurnEvaluatorClient:
                         "implausible for a burn or inconsistent with each other (for example an unknown "
                         "cause with a very short exposure, no pain and no blisters, or a severe-looking "
                         "grade with trivial answers), choose 'no_burn', whatever the cause, including "
-                        "unknown; never because of one answer alone. " + WEIGHT_INSTRUCTION
+                        "unknown; never because of one answer alone. The image model has no healthy-skin class: it "
+                        "always outputs a burn grade (Grad I, II or III), even for normal skin, so high "
+                        "image probabilities alone are not evidence of a burn when the answers contradict "
+                        "them (very brief exposure, no blisters, small area). Choose 'no_burn' in that case. " + WEIGHT_INSTRUCTION
                     ),
                     "criteria": BURN_CLASS_CRITERIA,
                 },
@@ -515,11 +630,45 @@ class JevBurnEvaluatorClient:
                 )
 
             severity_value = severity.get("score")
+            decision_confidence = _decision_confidence(classification.get("confidence"), cnn_prediction)
+            # The answers rule runs first: the image model has no healthy-skin class.
+            answers_class = _answers_override(choice, questionnaire)
+            answers_override = answers_class is not None
+            inconclusive_reason = None
+            if answers_override:
+                inconclusive_original = choice
+                choice = answers_class
+                requires_transfer = _answers_override_transfer(choice, questionnaire)
+                inconclusive = choice == INCONCLUSIVE_CLASS
+                if inconclusive:
+                    # Low confidence stays the reason if it applies too.
+                    inconclusive_reason = (
+                        INCONCLUSIVE_REASON
+                        if _is_inconclusive(inconclusive_original, decision_confidence)
+                        else ANSWERS_CONTRADICT_REASON
+                    )
+                else:
+                    inconclusive_original = None
+            else:
+                inconclusive = _is_inconclusive(choice, decision_confidence)
+                inconclusive_original = choice if inconclusive else None
+                if inconclusive:
+                    inconclusive_reason = INCONCLUSIVE_REASON
+                    choice = INCONCLUSIVE_CLASS
+                    requires_transfer = (
+                        transfer_probability >= 0.5
+                        or _red_flags(cnn_prediction, questionnaire)
+                        or _requires_transfer_without_burn(questionnaire)
+                    )
             recommendation = _recommendation_key(choice, requires_transfer)
 
             fp = _false_positive_check(cnn_prediction, questionnaire, choice)
+            if answers_override:
+                fp = {"possible_false_positive": False, "false_positive_reasons": []}
             if (
-                inconsistency is not None
+                not inconclusive
+                and not answers_override
+                and inconsistency is not None
                 and inconsistency >= JEV_INCONSISTENCY_THRESHOLD
                 and not _is_high_risk_cause(questionnaire)
                 and choice != "no_burn"
@@ -530,6 +679,12 @@ class JevBurnEvaluatorClient:
                 "status": "success",
                 "burn_degree_classification": choice,
                 "jev_original_classification": original_choice,
+                "decision_confidence": decision_confidence,
+                "inconclusive": inconclusive,
+                "inconclusive_reason": inconclusive_reason,
+                "inconclusive_original_classification": inconclusive_original,
+                "answers_override": answers_override,
+                "answers_override_reason": ANSWERS_CONTRADICT_REASON if answers_override else None,
                 "no_burn_overridden": no_burn_overridden,
                 "no_burn_override_reason": override_reason if no_burn_overridden else None,
                 "no_burn_support": support,
