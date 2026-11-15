@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 // ignore: deprecated_member_use
 import 'package:flutter/material.dart';
@@ -9,6 +10,7 @@ import 'assessment.dart';
 import 'classifier.dart';
 import 'jev_service.dart';
 import 'questions.dart';
+import 'scan_history.dart';
 
 // ÎNLOCUIEȘTE CU DATELE DIN PROIECTUL TĂU NOU SUPABASE (Project Settings > API):
 const String supabaseUrl = 'https://fzwiaeaspyvepblicmnd.supabase.co';
@@ -355,8 +357,6 @@ class CaptureScreen extends StatefulWidget {
 class _CaptureScreenState extends State<CaptureScreen> {
   final ImagePicker _picker = ImagePicker();
   bool _acceptedTerms = false;
-  bool _isSaving = false;
-  bool _isSaved = false; // current photo already uploaded to Supabase
   File? _selectedImage;
 
   bool get isRo => widget.currentLang == 'ro';
@@ -377,54 +377,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
     );
 
     if (picked != null) {
-      setState(() {
-        _selectedImage = File(picked.path);
-        _isSaved = false;
-      });
-    }
-  }
-
-  Future<void> _uploadToSupabaseStorageAndDb() async {
-    if (_selectedImage == null) return;
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
-
-    setState(() => _isSaving = true);
-
-    try {
-      final fileExt = _selectedImage!.path.split('.').last;
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}.$fileExt';
-      final storagePath = '${user.id}/$fileName';
-
-      // 1. Încarcă fișierul în bucket-ul 'burn_photos' în folderul user-ului
-      await supabase.storage.from('burn_photos').upload(
-            storagePath,
-            _selectedImage!,
-            fileOptions: const FileOptions(upsert: false),
-          );
-
-      // 2. Obține URL-ul pozei din Storage
-      final imageUrl =
-          supabase.storage.from('burn_photos').getPublicUrl(storagePath);
-
-      // 3. Salvează rândul în tabelul 'scans'
-      await supabase.from('scans').insert({
-        'user_id': user.id,
-        'image_url': imageUrl,
-      });
-
-      _showSnack(isRo
-          ? 'Poza a fost încărcată în burn_photos și salvată în baza de date!'
-          : 'Photo uploaded to burn_photos and saved to database!');
-
-      // Keep the photo so the user can still continue to the questions.
-      if (mounted) setState(() => _isSaved = true);
-    } catch (e) {
-      _showSnack(isRo
-          ? 'Eroare la încărcare în Supabase: $e'
-          : 'Error uploading to Supabase: $e');
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
+      setState(() => _selectedImage = File(picked.path));
     }
   }
 
@@ -452,6 +405,19 @@ class _CaptureScreenState extends State<CaptureScreen> {
           TextButton(
             onPressed: widget.onToggleLang,
             child: Text(isRo ? 'EN' : 'RO', style: TextStyle(color: accent)),
+          ),
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: isRo ? 'Istoric' : 'History',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => HistoryScreen(
+                  isDarkMode: widget.isDarkMode,
+                  currentLang: widget.currentLang,
+                ),
+              ),
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.logout, color: Color(0xFFFF6B6B)),
@@ -605,12 +571,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    onPressed: _isSaving
-                        ? null
-                        : () => setState(() {
-                              _selectedImage = null;
-                              _isSaved = false;
-                            }),
+                    onPressed: () => setState(() => _selectedImage = null),
                   ),
                   const SizedBox(height: 10),
                   ElevatedButton.icon(
@@ -639,43 +600,6 @@ class _CaptureScreenState extends State<CaptureScreen> {
                         ),
                       );
                     },
-                  ),
-                  const SizedBox(height: 10),
-                  ElevatedButton.icon(
-                    icon: _isSaving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.black,
-                            ),
-                          )
-                        : Icon(_isSaved ? Icons.cloud_done : Icons.cloud_upload),
-                    label: Text(
-                      _isSaving
-                          ? (isRo
-                              ? 'Se încarcă în Supabase...'
-                              : 'Uploading to Supabase...')
-                          : _isSaved
-                              ? (isRo ? 'Salvat în Cloud' : 'Saved to Cloud')
-                              : (isRo
-                                  ? 'Salvează în Cloud'
-                                  : 'Save to Cloud'),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: accent,
-                      foregroundColor: widget.isDarkMode
-                          ? const Color(0xFF0E1C14)
-                          : Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    onPressed: (_isSaving || _isSaved)
-                        ? null
-                        : _uploadToSupabaseStorageAndDb,
                   ),
                 ],
               ],
@@ -887,22 +811,80 @@ class AnalysisScreen extends StatefulWidget {
 class _AnalysisScreenState extends State<AnalysisScreen> {
   late final Future<BurnAssessment> _future = _run();
 
+  /// null = saving to history, true = saved, false = failed.
+  bool? _saved;
+
   bool get isRo => widget.currentLang == 'ro';
 
   Future<BurnAssessment> _run() async {
     final r = await OnnxBurnClassifierService().classifyImageFile(widget.imageFile);
     debugPrint('MODEL PROBABILITIES (softmax): ${r.probabilities}');
+    BurnAssessment result;
+    String pct(List<double> p) =>
+        p.map((v) => '${(v * 100).toStringAsFixed(1)}%').join(' / ');
+    final watch = Stopwatch()..start();
+    debugPrint('[JEV] Sending request to Edge Function "burn-decision"...');
     try {
       final decided = await JevService().decide(
         visionProbs: r.probabilities,
         brightness: r.brightness,
         answers: widget.answers,
       );
-      return fromJev(r.probabilities, decided, widget.answers);
+      debugPrint('[JEV] ✅ WORKS: answered in ${watch.elapsedMilliseconds} ms. '
+          'Grad I / II / III = ${pct(decided)}');
+      result = fromJev(r.probabilities, decided, widget.answers);
     } catch (e) {
-      debugPrint('Jev unavailable, using local formula: $e');
-      return combine(r.probabilities, widget.answers);
+      final reason = switch (e) {
+        FunctionException(:final status, :final details) =>
+          'Edge Function returned HTTP $status: $details',
+        TimeoutException() => 'no answer within 25 s (timeout)',
+        _ => '${e.runtimeType}: $e',
+      };
+      debugPrint('[JEV] ❌ FAILED after ${watch.elapsedMilliseconds} ms: $reason');
+      debugPrint('[JEV] ⚠️ Using LOCAL FORMULA instead of Jev.');
+      result = combine(r.probabilities, widget.answers);
     }
+    _saveToHistory(result); // runs in the background; the result shows right away
+    return result;
+  }
+
+  /// Saves the photo + result once per analysis. A failure doesn't hide the result.
+  Future<void> _saveToHistory(BurnAssessment result) async {
+    try {
+      await ScanHistoryService().save(widget.imageFile, result);
+      if (mounted) setState(() => _saved = true);
+    } catch (e) {
+      debugPrint('Saving to history failed: $e');
+      if (mounted) setState(() => _saved = false);
+    }
+  }
+
+  Widget _saveStatus(Color accent) {
+    final (IconData icon, String text, Color color) = switch (_saved) {
+      null => (
+          Icons.cloud_upload_outlined,
+          isRo ? 'Se salvează în istoric...' : 'Saving to history...',
+          accent.withValues(alpha: 0.7),
+        ),
+      true => (
+          Icons.cloud_done_outlined,
+          isRo ? 'Salvat în istoric' : 'Saved to history',
+          const Color(0xFF58B97D),
+        ),
+      false => (
+          Icons.cloud_off_outlined,
+          isRo ? 'Nu s-a putut salva în istoric' : 'Could not save to history',
+          const Color(0xFFFF6B6B),
+        ),
+    };
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 6),
+        Text(text, style: TextStyle(fontSize: 12.5, color: color)),
+      ],
+    );
   }
 
   /// Opens Google Maps (app if installed, otherwise browser) with a search for
@@ -1209,6 +1191,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    _saveStatus(accent),
                     const SizedBox(height: 14),
                     Text(
                       isRo
