@@ -1,0 +1,3479 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CromerCare</title>
+  <link rel="icon" type="image/png" href="/logo.png?v=2026-11-14.15">
+  <link rel="apple-touch-icon" href="/logo.png?v=2026-11-14.15">
+  <meta name="theme-color" content="#0F2318">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg-dark: #060E09;         
+      --card-bg: #2A6E46;         
+      --primary-hover: #225A39;   
+      --accent: #F2F8F3;          
+      --text-main: #FFFFFF;       
+      --text-dark: #0A150F;       
+      --dropdown-bg: #183024;     
+      --disclaimer-bg: rgba(90, 55, 15, 0.88);
+      --disclaimer-border: #F0B84A;
+      --disclaimer-text: #fff;
+      --border-color: #8FE0AC;
+      --input-bg: #0A1710;
+      --link-color: #9BEBB5;
+      --danger-color: #FF8A80;
+      --divider-color: rgba(200, 220, 205, 0.45);
+      --track-color: rgba(200, 220, 205, 0.35);
+      --tint-bg: rgba(111, 203, 146, 0.16);
+      --bar-fill: #6FCB92;
+      --placeholder-color: #C2CFC5;
+      --urgent-text: #FFE0DD;
+    }
+
+    body.light-mode {
+      color-scheme: light;
+      --bg-dark: #F3F7F2;         
+      --card-bg: #2E7048;         
+      --primary-hover: #245A39;
+      --accent: #10261A;          
+      --text-main: #10261A;       
+      --text-dark: #FFFFFF;       
+      --dropdown-bg: #DCE8DF;     
+      --disclaimer-bg: rgba(230, 240, 233, 0.95);
+      --disclaimer-border: #2E7048;
+      --disclaimer-text: #10261A;
+      --border-color: #2E7048;
+      --input-bg: #FFFFFF;
+      --link-color: #1F6B3F;
+      --danger-color: #C62828;
+      --divider-color: rgba(16, 38, 26, 0.35);
+      --track-color: rgba(16, 38, 26, 0.25);
+      --tint-bg: rgba(63, 137, 90, 0.2);
+      --bar-fill: #2E7048;
+      --placeholder-color: rgba(16, 38, 26, 0.7);
+      --urgent-text: #C62828;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at center, rgba(63, 137, 90, 0.35) 0%, var(--bg-dark) 75%),
+        linear-gradient(rgba(100, 100, 100, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(100, 100, 100, 0.05) 1px, transparent 1px);
+      background-size: 100% 100%, 25px 25px, 25px 25px;
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      padding: 12px 20px;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    .site-wrapper {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transform-origin: top center;
+      transition: transform 0.3s ease;
+    }
+
+    header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      position: relative;
+    }
+
+    .header-titles {
+      text-align: left;
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      color: var(--accent);
+      margin-bottom: 2px;
+    }
+
+    p.subtitle {
+      font-size: 0.75rem;
+      color: var(--text-main);
+      opacity: 0.8;
+    }
+
+    .auth-card, .questionnaire-card {
+      width: 100%;
+      background: var(--dropdown-bg);
+      border: 1.5px solid var(--border-color);
+      border-radius: 16px;
+      padding: 20px 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      margin-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .auth-card h2, .questionnaire-card h3 {
+      font-size: 1.1rem;
+      color: var(--accent);
+      text-align: center;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .form-group label {
+      font-size: 0.8rem;
+      color: var(--text-main);
+    }
+
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      background: var(--input-bg);
+      color: var(--text-main);
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    body.light-mode .hospital-card { color: #fff; }
+    body:not(.light-mode) p.subtitle { opacity: 0.92; }
+    body:not(.light-mode) .close-info-btn { opacity: 0.9; }
+    body:not(.light-mode) .checkbox-row input { accent-color: var(--link-color); }
+    body:not(.light-mode) .btn-secondary,
+    body:not(.light-mode) .hospital-card { border-color: var(--border-color); }
+
+    .form-group select option,
+    .form-group select optgroup {
+      background-color: var(--dropdown-bg);
+      color: var(--text-main);
+    }
+
+    .form-group input::placeholder {
+      color: var(--placeholder-color);
+      opacity: 1;
+    }
+
+    .form-group input:focus, .form-group select:focus {
+      border-color: var(--link-color);
+      box-shadow: 0 0 0 2px var(--link-color);
+    }
+
+    .form-group input:-webkit-autofill,
+    .form-group input:-webkit-autofill:focus {
+      -webkit-text-fill-color: var(--text-main);
+      caret-color: var(--text-main);
+      box-shadow: 0 0 0 1000px var(--dropdown-bg) inset;
+      transition: background-color 9999s ease-out 0s;
+    }
+
+    .checkbox-row {
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .checkbox-row input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--card-bg);
+    }
+
+    .auth-switch {
+      font-size: 0.8rem;
+      text-align: center;
+      color: var(--text-main);
+      margin-top: 6px;
+    }
+
+    .auth-switch span {
+      color: var(--link-color);
+      cursor: pointer;
+      font-weight: bold;
+      text-decoration: underline;
+    }
+
+    .settings-container {
+      position: relative;
+    }
+
+    .settings-btn {
+      background: var(--card-bg);
+      color: #fff;
+      border: 1px solid var(--accent);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: background 0.2s;
+    }
+
+    .settings-btn:hover {
+      background: var(--primary-hover);
+    }
+
+    .dropdown-menu {
+      position: absolute;
+      right: 0;
+      top: 44px;
+      background: var(--dropdown-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      width: 230px;
+      display: none;
+      flex-direction: column;
+      z-index: 100;
+      overflow: hidden;
+    }
+
+    .dropdown-menu.show {
+      display: flex;
+    }
+
+    .dropdown-item {
+      padding: 11px 16px;
+      font-size: 0.85rem;
+      color: var(--text-main);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid var(--divider-color);
+      cursor: pointer;
+      background: none;
+      border: none;
+      width: 100%;
+      text-align: left;
+    }
+
+    .dropdown-item:hover {
+      background: var(--card-bg);
+      color: #fff;
+    }
+
+    .dropdown-item.logout-item {
+      color: var(--danger-color);
+    }
+
+    .info-box {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(0, 0, 0, 0.55);
+      animation: fadeIn 0.2s ease;
+    }
+
+    .info-box.show {
+      display: flex;
+    }
+
+    .info-box-dialog {
+      width: 100%;
+      max-width: 420px;
+      max-height: 85vh;
+      overflow-y: auto;
+      background-color: var(--dropdown-bg);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 14px 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    .info-box-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-weight: 600;
+      font-size: 1rem;
+      color: var(--accent);
+    }
+
+    .info-box-content {
+      font-size: 0.9rem;
+      color: var(--text-main);
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+
+    .close-info-btn {
+      background: none;
+      border: none;
+      color: var(--accent);
+      font-size: 0.95rem;
+      cursor: pointer;
+      opacity: 0.7;
+    }
+
+    .disclaimer-container {
+      width: 100%;
+      background: var(--disclaimer-bg);
+      border: 1.5px solid var(--disclaimer-border);
+      border-radius: 10px;
+      padding: 8px 12px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .disclaimer-container input[type="checkbox"] {
+      margin-top: 3px;
+      width: 18px;
+      height: 18px;
+      accent-color: var(--disclaimer-border);
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    .disclaimer-container label {
+      font-size: 0.76rem;
+      font-weight: 500;
+      color: var(--disclaimer-text);
+      line-height: 1.35;
+      cursor: pointer;
+    }
+
+    .camera-container {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      max-height: 300px;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.6);
+      background-color: #000;
+      border: 2.5px solid var(--border-color);
+    }
+
+    .camera-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 14px;
+      text-align: center;
+      overflow-y: auto;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+    }
+
+    .camera-overlay.show {
+      display: flex;
+    }
+
+    .camera-toast {
+      position: absolute;
+      left: 50%;
+      bottom: 12px;
+      transform: translateX(-50%);
+      z-index: 6;
+      display: none;
+      max-width: 90%;
+      padding: 8px 14px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      text-align: center;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      border: 1.5px solid var(--border-color);
+      pointer-events: none;
+    }
+
+    .camera-toast.show {
+      display: block;
+    }
+
+    .camera-overlay > i {
+      font-size: 1.8rem;
+      color: var(--border-color);
+    }
+
+    .camera-overlay-msg {
+      font-size: 0.88rem;
+      font-weight: 600;
+      line-height: 1.35;
+    }
+
+    .camera-overlay-steps {
+      font-size: 0.76rem;
+      line-height: 1.4;
+      color: var(--placeholder-color);
+    }
+
+    .camera-overlay-steps:empty {
+      display: none;
+    }
+
+    .camera-overlay-btn {
+      width: 100%;
+      max-width: 260px;
+      padding: 12px 16px;
+      border: none;
+      border-radius: 12px;
+      background-color: var(--card-bg);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .camera-overlay-btn:hover {
+      background-color: var(--primary-hover);
+    }
+
+    #cameraStream.mirrored {
+      transform: scaleX(-1);
+    }
+
+    #cameraStream {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .viewfinder {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 60%;
+      height: 60%;
+      border: 2.5px dashed #fff;
+      border-radius: 50%;
+      pointer-events: none;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.65);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .viewfinder::after {
+      content: attr(data-label);
+      color: var(--text-dark);
+      font-weight: 600;
+      font-size: 0.7rem;
+      background: var(--accent);
+      padding: 3px 8px;
+      border-radius: 15px;
+      position: absolute;
+      bottom: -28px;
+      white-space: nowrap;
+      border: 1px solid var(--bg-dark);
+    }
+
+    .controls {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 11px;
+      border-radius: 10px;
+      border: none;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+
+    .btn-primary {
+      background-color: var(--accent);
+      color: var(--text-dark);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+
+    .btn-primary:disabled {
+      background-color: #777777;
+      color: #bbbbbb;
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+
+    body:not(.light-mode) .btn-primary:disabled {
+      background-color: #2f4a3a;
+      color: #c4c8c3;
+      opacity: 0.85;
+    }
+
+    .btn-secondary {
+      background-color: var(--card-bg);
+      color: #fff;
+      border: 1px solid var(--accent);
+    }
+
+    .preview-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: var(--bg-dark);
+      display: none;
+      z-index: 10;
+    }
+
+    #capturedImage {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      cursor: zoom-in;
+    }
+
+    .zoom-hint {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--bg-dark);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      pointer-events: none;
+    }
+
+    .badge {
+      pointer-events: none;
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: var(--bg-dark);
+      color: var(--accent);
+      padding: 4px 8px;
+      border-radius: 8px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      border: 1px solid var(--accent);
+    }
+
+    /* Combined ML & JEV Result Card Styles */
+    .result-card {
+      width: 100%;
+      background-color: var(--dropdown-bg);
+      border: 1.5px solid var(--border-color);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-top: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .result-card.show {
+      display: flex;
+    }
+
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--divider-color);
+      padding-bottom: 8px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .recommendation {
+      margin: 12px 0;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 2px solid;
+      white-space: pre-line;
+      line-height: 1.5;
+      text-align: left;
+    }
+    .recommendation[hidden] { display: none; }
+    .no-burn-note { margin-top: 8px; font-size: 0.9rem; opacity: 0.85; }
+    .no-burn-note[hidden] { display: none; }
+    .fp-warning {
+      margin: 12px 0;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 2px solid #f9a825;
+      background: rgba(249, 168, 37, 0.16);
+      color: #8a5a00;
+      line-height: 1.5;
+      text-align: left;
+    }
+    .fp-warning[hidden] { display: none; }
+    .fp-warning strong { display: block; }
+    .fp-warning ul { margin: 6px 0 0 18px; padding: 0; font-size: 0.92em; }
+    body:not(.light-mode) .fp-warning { color: #ffd54f; }
+    .recommendation.go_to_hospital { border-color: #e53935; background: rgba(229, 57, 53, 0.16); color: #c62828; font-weight: 600; }
+    .recommendation.treat_at_home { border-color: #f9a825; background: rgba(249, 168, 37, 0.16); color: #8a5a00; }
+    .recommendation.nothing_to_do { border-color: #43a047; background: rgba(67, 160, 71, 0.16); color: #2e7d32; }
+    body:not(.light-mode) .recommendation.go_to_hospital { color: #ff8a80; }
+    body:not(.light-mode) .recommendation.treat_at_home { color: #ffd54f; }
+    body:not(.light-mode) .recommendation.nothing_to_do { color: #a5d6a7; }
+    .recommendation.see_doctor { border-color: #607d8b; background: rgba(96, 125, 139, 0.16); color: #37474f; }
+    body:not(.light-mode) .recommendation.see_doctor { color: #b0bec5; }
+    .jev-section {
+      background: var(--tint-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 0.82rem;
+    }
+
+    .jev-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .confidence-block {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 4px 12px;
+      margin: 14px 0 12px;
+      padding: 10px 0;
+      border-top: 1px solid var(--border-color);
+      color: var(--text-main);
+    }
+    .confidence-block[hidden] { display: none; }
+    .confidence-label { font-size: 1rem; font-weight: 600; }
+    .confidence-value { font-size: 1.8rem; font-weight: 700; color: var(--link-color); }
+    .confidence-source { flex-basis: 100%; font-size: 0.75rem; opacity: 0.8; }
+
+    .prob-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .prob-row {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 0.78rem;
+    }
+
+    .prob-label-row {
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-main);
+    }
+
+    .prob-bar-bg {
+      width: 100%;
+      height: 6px;
+      background: var(--track-color);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .prob-bar-fill {
+      height: 100%;
+      background: var(--bar-fill);
+      border-radius: 4px;
+      transition: width 0.4s ease;
+    }
+
+    .app-section {
+      display: none;
+      width: 100%;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .app-section.active {
+      display: flex;
+    }
+
+    .history-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      margin-bottom: 14px;
+    }
+
+    .history-header h2 {
+      font-size: 1.2rem;
+      color: var(--text-main);
+    }
+
+    .history-back-btn {
+      background: var(--dropdown-bg);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .history-card {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      background: var(--dropdown-bg);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 10px;
+    }
+
+    .history-thumb {
+      width: 80px;
+      height: 80px;
+      object-fit: cover;
+      border-radius: 8px;
+      cursor: zoom-in;
+      flex-shrink: 0;
+      background: var(--bg-dark);
+    }
+
+    .history-thumb-empty {
+      width: 80px;
+      height: 80px;
+      border-radius: 8px;
+      flex-shrink: 0;
+      background: var(--bg-dark);
+    }
+
+    .history-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 0.9rem;
+    }
+
+    .history-class {
+      font-weight: 700;
+    }
+
+    .history-status {
+      width: 100%;
+      text-align: center;
+      color: var(--text-main);
+      padding: 16px 0;
+    }
+
+    .history-more-btn {
+      margin-top: 12px;
+    }
+
+    .image-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      cursor: zoom-out;
+    }
+
+    .image-overlay.show {
+      display: flex;
+    }
+
+    .image-overlay {
+      flex-direction: column;
+      padding: 0;
+    }
+
+    .image-overlay-stage {
+      flex: 1 1 auto;
+      min-height: 0;
+      width: 100%;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      cursor: zoom-out;
+    }
+
+    .image-overlay-stage.zoomed { cursor: grab; }
+    .image-overlay-stage.dragging { cursor: grabbing; }
+
+    .image-overlay-stage img {
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+      transform-origin: center center;
+      will-change: transform;
+      cursor: zoom-in;
+      -webkit-user-drag: none;
+    }
+
+    .image-overlay-stage.zoomed img { cursor: inherit; }
+
+    .image-overlay-controls {
+      flex: 0 0 auto;
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      padding: 8px 0;
+    }
+
+    .image-overlay-controls button {
+      width: 44px;
+      height: 44px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+      font-size: 1.1rem;
+      cursor: pointer;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+    }
+
+    .image-overlay-controls button:disabled { opacity: 0.4; cursor: default; }
+
+    .image-overlay-caption {
+      flex: 0 0 auto;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+      text-align: center;
+      color: #fff;
+      font-size: 0.95rem;
+      background: rgba(0, 0, 0, 0.6);
+    }
+
+    .image-overlay-close {
+      position: absolute;
+      top: calc(10px + env(safe-area-inset-top));
+      right: 10px;
+      width: 44px;
+      height: 44px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+      font-size: 1.6rem;
+      line-height: 1;
+      cursor: pointer;
+      z-index: 1;
+    }
+
+    .history-card[role="button"] { cursor: pointer; }
+    .history-card[role="button"]:focus-visible { outline: 2px solid var(--accent); }
+
+    .hospital-card {
+      display: none;
+      margin-top: 16px;
+      padding: 16px;
+      border-radius: 12px;
+      background: var(--card-bg);
+      color: var(--text-main);
+      border: 1px solid var(--accent);
+    }
+    .hospital-card.show { display: block; }
+    .hospital-card.urgent { border-width: 3px; border-color: #e53935; box-shadow: 0 0 14px rgba(229, 57, 53, 0.45); }
+    .hospital-card .hospital-title { font-weight: 700; margin-bottom: 8px; }
+    .hospital-card .hospital-urgent { display: none; color: var(--urgent-text); font-weight: 700; margin-bottom: 8px; }
+    .hospital-card.urgent .hospital-urgent { display: block; }
+    #hospitalMap { display: none; width: 100%; height: 260px; border-radius: 8px; margin: 8px 0; z-index: 0; }
+    #hospitalMap.show { display: block; }
+    #hospitalMap, #hospitalMap.leaflet-container { cursor: pointer; }
+    .hospital-map-hint { font-size: 0.8rem; opacity: 0.8; margin: 0 0 8px; display: none; }
+    .hospital-map-hint.show { display: block; }
+    .hospital-info { margin: 4px 0; font-size: 0.9rem; word-break: break-word; }
+    .hospital-links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+    .hospital-links a { color: var(--accent); font-weight: 600; text-decoration: underline; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    /* Custom answer picker (bottom sheet), above dropdown (100), below imageOverlay (1000) */
+    .opt-picker {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 900;
+      background: rgba(0, 0, 0, 0.6);
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .opt-picker.show { display: flex; }
+    .opt-sheet {
+      width: 100%;
+      max-width: 560px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      background: var(--dropdown-bg);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      border-bottom: none;
+      border-radius: 16px 16px 0 0;
+      box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    .opt-sheet-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 16px 14px 12px 18px;
+      border-bottom: 1px solid var(--divider-color);
+    }
+    .opt-sheet-title {
+      flex: 1;
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 700;
+      line-height: 1.35;
+      color: var(--text-main);
+    }
+    .opt-sheet-close {
+      flex: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 1px solid var(--border-color);
+      background: var(--input-bg);
+      color: var(--text-main);
+      font-size: 1.4rem;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .opt-sheet-list {
+      list-style: none;
+      margin: 0;
+      padding: 8px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .opt-sheet-option {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      width: 100%;
+      min-height: 54px;
+      padding: 12px 14px;
+      margin: 0 0 6px;
+      text-align: left;
+      font: inherit;
+      font-size: 1rem;
+      color: var(--text-main);
+      background: var(--input-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .opt-sheet-option:hover, .opt-sheet-option:focus-visible { outline: 2px solid var(--accent); }
+    .opt-sheet-option[aria-selected="true"] { background: var(--tint-bg); font-weight: 700; border-width: 2px; }
+    .opt-sheet-option[aria-selected="true"]::after { content: "\2713"; color: var(--link-color); font-weight: 700; }
+    .questionnaire-card select { cursor: pointer; }
+  </style>
+</head>
+<body>
+
+  <div class="site-wrapper" id="siteWrapper">
+    <header>
+      <div class="header-titles">
+        <h1><img src="/logo.png?v=2026-11-14.15" width="32" height="32" alt="" style="vertical-align:middle;border-radius:7px" onerror="this.onerror=null;this.src='/favicon.svg'"> CromerCare</h1>
+        <p class="subtitle" id="subtitleText">Analiză de prim ajutor</p>
+      </div>
+      
+      <div class="settings-container">
+        <button class="settings-btn" id="settingsBtn" title="Setări">
+          <i class="fa-solid fa-gear"></i>
+        </button>
+        <div class="dropdown-menu" id="dropdownMenu">
+          <button class="dropdown-item" id="guideBtn"><i class="fa-solid fa-book-open"></i> <span id="guideBtnText">Ghid de captură</span></button>
+          <button class="dropdown-item" id="aboutBtn"><i class="fa-solid fa-circle-info"></i> <span id="aboutBtnText">Despre CromerCare</span></button>
+          <button class="dropdown-item" id="zoomBtn"><i class="fa-solid fa-magnifying-glass-plus" id="zoomIcon"></i> <span id="zoomBtnText">Zoom In</span></button>
+          <button class="dropdown-item" id="themeBtn"><i class="fa-solid fa-moon" id="themeIcon"></i> <span id="themeBtnText">Light Mode</span></button>
+          <button class="dropdown-item" id="langBtn"><i class="fa-solid fa-globe"></i> <span id="langBtnText">English</span></button>
+          <button class="dropdown-item" id="historyBtn" style="display: none;"><i class="fa-solid fa-clock-rotate-left"></i> <span id="historyBtnText">Istoric analize</span></button>
+          <button class="dropdown-item logout-item" id="logoutBtn" style="display: none;"><i class="fa-solid fa-right-from-bracket"></i> <span id="logoutBtnText">Deconectare</span></button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Auth Section -->
+    <div class="auth-card app-section active" id="authSection">
+      <h2 id="authTitle">Autentificare Pacient</h2>
+      
+      <div class="form-group">
+        <label for="emailInput" id="emailLabel">Email</label>
+        <input type="email" id="emailInput" placeholder="nume@exemplu.ro">
+      </div>
+
+      <div class="form-group">
+        <label for="passwordInput" id="passwordLabel">Parolă</label>
+        <input type="password" id="passwordInput" placeholder="••••••••">
+      </div>
+
+      <button class="btn btn-secondary" id="authSubmitBtn">Conectare</button>
+
+      <div class="auth-switch">
+        <span id="switchText">Nu ai un cont?</span> <span id="toggleAuthMode">Creează un cont nou</span>
+      </div>
+    </div>
+
+    <!-- Camera & Assessment Section -->
+    <div class="app-section" id="cameraSection">
+
+      <div class="disclaimer-container">
+        <input type="checkbox" id="termsCheckbox">
+        <label for="termsCheckbox" id="disclaimerLabel">Înțeleg și accept în mod expres că această platformă NU oferă un diagnostic medical real și că rezultatele pot fi eronate.</label>
+      </div>
+
+      <!-- Questionnaire Card for JEV Input -->
+      <div class="questionnaire-card">
+        <h3 id="qTitle">Chestionar Anamneză</h3>
+        
+        <div class="form-group">
+          <label id="q3Label" for="q3_cause">1. Care este cauza arsurii?</label>
+          <select id="q3_cause">
+            <option value="Termică (opărire, flacără, atingere suprafață fierbinte)">Termică (opărire, flacără, atingere suprafață fierbinte)</option>
+            <option value="Chimică (acizi, sodă caustică, înălbitori concentrați / detergenți industriali)">Chimică (acizi, sodă caustică, înălbitori concentrați / detergenți industriali)</option>
+            <option value="Electrică (electrocutare)">Electrică (electrocutare)</option>
+            <option value="Radiații (expunere raze UV/X)">Radiații (expunere raze UV/X)</option>
+            <option value="Altele (frecare, la căzături)">Altele (frecare, la căzături)</option>
+            <option value="Expunere la soare">Expunere la soare</option>
+            <option value="Nu știu ce a cauzat arsura">Nu știu ce a cauzat arsura</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label id="q0Label" for="q0_exposure">2. Cât timp a durat expunerea la cauza arsurii?</label>
+          <select id="q0_exposure">
+            <option value="&lt; 1 secundă">&lt; 1 secundă</option>
+            <option value="&lt; 10 secunde" selected>&lt; 10 secunde</option>
+            <option value="&gt; 1 minut">&gt; 1 minut</option>
+            <option value="Expunere repetată">Expunere repetată</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label id="q1Label" for="q1_pain">3. Selectați gradul de durere resimțit la nivelul arsurii?</label>
+          <select id="q1_pain">
+            <option value="0–2 (fără durere / disconfort)">0–2 (fără durere / disconfort)</option>
+            <option value="3–4 (durere ușoară)">3–4 (durere ușoară)</option>
+            <option value="5–6 (durere moderată)" selected>5–6 (durere moderată)</option>
+            <option value="7–8 (durere puternică)">7–8 (durere puternică)</option>
+            <option value="9-10 (durere insuportabilă)">9-10 (durere insuportabilă)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label id="qAgeLabel" for="q_age">4. Ce vârstă are persoana afectată?</label>
+          <select id="q_age">
+            <option value="&lt; 2 ani">&lt; 2 ani</option>
+            <option value="2–5 ani">2–5 ani</option>
+            <option value="5–59 ani" selected>5–59 ani</option>
+            <option value="&gt; 60 ani">&gt; 60 ani</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label id="q2Label" for="q2_sensitive">5. Este arsura într-o zonă periculoasă/sensibilă (palme, tălpi, față, gât, zona genitală)?</label>
+          <select id="q2_sensitive">
+            <option value="Da">Da</option>
+            <option value="Nu" selected>Nu</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label id="q4Label" for="q4_size">6. Suprafața arsurii este mai mare de o palmă?</label>
+          <select id="q4_size">
+            <option value="Da">Da</option>
+            <option value="Nu" selected>Nu</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label id="q5Label" for="q5_blisters">7. Există vezicule (bășici) mari?</label>
+          <select id="q5_blisters">
+            <option value="Da">Da</option>
+            <option value="Nu" selected>Nu</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="camera-container" style="margin-top: 10px;">
+        <video id="cameraStream" autoplay playsinline muted></video>
+        <div class="viewfinder" id="viewfinder" data-label="Poziționează leziunea aici"></div>
+
+        <div class="camera-overlay" id="cameraOverlay" role="status" aria-live="polite">
+          <i class="fa-solid fa-video-slash" aria-hidden="true"></i>
+          <div class="camera-overlay-msg" id="cameraOverlayMsg"></div>
+          <div class="camera-overlay-steps" id="cameraOverlaySteps"></div>
+          <button type="button" class="camera-overlay-btn" id="cameraOverlayBtn"></button>
+        </div>
+        <div class="camera-toast" id="cameraToast" role="status" aria-live="polite"></div>
+
+        <div class="preview-container" id="previewContainer">
+          <img id="capturedImage" alt="Previzualizare">
+          <div class="badge" id="badgeSaved"><i class="fa-solid fa-check"></i> Imagine salvată</div>
+          <div class="zoom-hint" aria-hidden="true"><i class="fa-solid fa-magnifying-glass-plus"></i></div>
+        </div>
+      </div>
+
+      <!-- Combined ML & JEV Analysis Results Card -->
+      <div class="result-card" id="resultCard">
+        <div class="result-header">
+          <span><i class="fa-solid fa-microscope"></i> <span id="resultHeaderTitle">Rezultat analiză</span></span>
+          <span id="dbStatusBadge" style="font-size: 0.7rem; opacity: 0.85;"></span>
+        </div>
+
+        <!-- JEV Decision Output Section -->
+        <div class="jev-section" id="jevSection">
+          <div class="jev-row">
+            <strong id="jevDegreeLabel">Clasificare JEV:</strong>
+            <span id="jevDegree" style="color: var(--link-color); font-weight: 700;">-</span>
+          </div>
+          <div class="jev-row">
+            <strong id="jevSeverityLabel">Scor Severitate (0-5):</strong>
+            <span id="jevSeverity">-</span>
+          </div>
+          <div class="jev-row">
+            <strong id="jevTransferLabel">Transfer Urgent:</strong>
+            <span id="jevTransfer">-</span>
+          </div>
+        </div>
+
+        <!-- Recommendation -->
+        <div class="fp-warning" id="fpWarning" role="alert" hidden></div>
+        <div class="recommendation" id="recommendation" hidden></div>
+        <div class="no-burn-note" id="noBurnNote" hidden></div>
+
+        <!-- CNN Probability Breakdown -->
+        <div class="confidence-block" id="confidenceBlock" hidden>
+          <span class="confidence-label" id="confidenceLabel"></span>
+          <span class="confidence-value" id="confidenceValue"></span>
+          <span class="confidence-source" id="confidenceSource"></span>
+        </div>
+        <div class="prob-list" id="probList"></div>
+      </div>
+
+      <!-- Nearest hospital -->
+      <div class="hospital-card" id="hospitalCard">
+        <div class="hospital-title"><i class="fa-solid fa-hospital"></i> <span id="hospitalTitle"></span></div>
+        <div class="hospital-urgent" id="hospitalUrgent"></div>
+        <div class="hospital-info" id="hospitalStatus"></div>
+        <div id="hospitalMap"></div>
+        <div class="hospital-map-hint" id="hospitalMapHint"></div>
+        <div class="hospital-info" id="hospitalName"></div>
+        <div class="hospital-info" id="hospitalAddress"></div>
+        <div class="hospital-info" id="hospitalDistance"></div>
+        <div class="hospital-links">
+          <a id="hospitalDirections" href="#" target="_blank" rel="noopener noreferrer" style="display: none;"></a>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button id="captureBtn" class="btn btn-primary" disabled>
+          <i class="fa-solid fa-camera"></i> <span id="captureBtnText">Fă Poză Leziune</span>
+        </button>
+        <button id="switchCameraBtn" class="btn btn-secondary" style="display: none;" type="button">
+          <i class="fa-solid fa-camera-rotate"></i> <span id="switchCameraBtnText">Schimbă camera</span>
+        </button>
+        <button id="retakeBtn" class="btn btn-secondary" style="display: none;">
+          <i class="fa-solid fa-rotate-left"></i> <span id="retakeBtnText">Fă altă poză</span>
+        </button>
+        <button id="confirmBtn" class="btn btn-primary" style="display: none;">
+          <span id="confirmBtnText">Analizează poza</span> <i class="fa-solid fa-arrow-right"></i>
+        </button>
+        <button id="cancelEvalBtn" class="btn btn-secondary" style="display: none;" type="button">
+          <i class="fa-solid fa-xmark"></i> <span id="cancelEvalBtnText">Anulează</span>
+        </button>
+      </div>
+      <div id="evalStatus" style="display: none; text-align: center; font-size: 0.85rem; margin-top: 8px;"></div>
+      <div id="appVersionLabel" style="text-align: center; font-size: 0.7rem; opacity: 0.6; margin-top: 8px;"></div>
+    </div>
+
+    <!-- History Section -->
+    <div class="app-section" id="historySection">
+      <div class="history-header">
+        <button class="history-back-btn" id="historyBackBtn"><i class="fa-solid fa-arrow-left"></i> <span id="historyBackText">Înapoi</span></button>
+        <h2 id="historyTitle">Istoric analize</h2>
+      </div>
+      <div class="history-status" id="historyStatus" style="display: none;"></div>
+      <div class="history-list" id="historyList"></div>
+      <button class="btn btn-secondary history-more-btn" id="historyMoreBtn" style="display: none;"></button>
+    </div>
+
+  </div>
+
+  <div class="info-box" id="infoBox">
+    <div class="info-box-dialog" role="dialog" aria-modal="true" aria-labelledby="infoTitle">
+      <div class="info-box-header">
+        <span id="infoTitle">Titlu</span>
+        <button class="close-info-btn" id="closeInfoBtn" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="info-box-content" id="infoContent"></div>
+    </div>
+  </div>
+
+  <div class="opt-picker" id="optPicker" hidden>
+    <div class="opt-sheet" id="optSheet" role="dialog" aria-modal="true" aria-labelledby="optSheetTitle">
+      <div class="opt-sheet-header">
+        <h3 class="opt-sheet-title" id="optSheetTitle"></h3>
+        <button type="button" class="opt-sheet-close" id="optSheetClose" aria-label="Close">&times;</button>
+      </div>
+      <ul class="opt-sheet-list" id="optSheetList" role="listbox" aria-labelledby="optSheetTitle"></ul>
+    </div>
+  </div>
+
+  <div class="image-overlay" id="imageOverlay"><button type="button" class="image-overlay-close" id="imageOverlayClose" aria-label="Close">&times;</button><div class="image-overlay-stage" id="imageOverlayStage"><img id="imageOverlayImg" alt=""></div><div class="image-overlay-controls"><button type="button" id="imageZoomOut"><i class="fa-solid fa-minus"></i></button><button type="button" id="imageZoomReset"><i class="fa-solid fa-expand"></i></button><button type="button" id="imageZoomIn"><i class="fa-solid fa-plus"></i></button></div><div class="image-overlay-caption" id="imageOverlayCaption"></div></div>
+
+  <canvas id="photoCanvas" width="600" height="600" style="display: none;"></canvas>
+
+  <script>
+    // --- CLIENT DIAGNOSTICS (no devtools needed) ---
+    const APP_VERSION = "2026-11-15.2";
+    const CLOG_MAX_EVENTS = 200;
+    const CLOG_FLUSH_MS = 2000;
+    const CLOG_MAX_MSG = 500;
+    const clogSession = Math.random().toString(36).slice(2, 10).padEnd(8, '0');
+    const clogStart = performance.now();
+    const clogEvents = [];
+    let clogPending = [];
+
+    function clogLine(ev) { return `+${ev.t}ms ${ev.level}: ${ev.msg}`; }
+
+    function clog(level, msg) {
+      try {
+        const ev = { t: Math.round(performance.now() - clogStart), level: String(level), msg: String(msg).slice(0, CLOG_MAX_MSG) };
+        clogEvents.push(ev);
+        if (clogEvents.length > CLOG_MAX_EVENTS) clogEvents.shift();
+        clogPending.push(ev);
+        if (clogPending.length > CLOG_MAX_EVENTS) clogPending.shift();
+        console.warn('[clog]', clogLine(ev));
+      } catch (_) {}
+    }
+
+    function clogFlush() {
+      try {
+        if (!clogPending.length) return;
+        const batch = clogPending;
+        clogPending = [];
+        const body = JSON.stringify({ session: clogSession, version: APP_VERSION, ua: navigator.userAgent, events: batch });
+        let sent = false;
+        try {
+          if (navigator.sendBeacon) sent = navigator.sendBeacon('/api/client-log', new Blob([body], { type: 'application/json' }));
+        } catch (_) {}
+        if (!sent) {
+          fetch('/api/client-log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true })
+            .catch(() => {});
+        }
+      } catch (_) {}
+    }
+
+    function describeEl(el) {
+      if (!el || !el.tagName) return 'none';
+      let s = el.tagName.toLowerCase();
+      if (el.id) s += '#' + el.id;
+      const cls = typeof el.className === 'string' ? el.className.trim().split(/\s+/).filter(Boolean).slice(0, 3).join('.') : '';
+      if (cls) s += '.' + cls;
+      return s;
+    }
+
+    // alert() wrapper: logs the message first, then shows it.
+    function notify(msg, logMsg) {
+      clog('alert', logMsg || msg);
+      alert(msg);
+    }
+
+    window.addEventListener('error', (e) => {
+      clog('error', `onerror: ${e.message} @${String(e.filename || '').split('/').pop()}:${e.lineno}:${e.colno}`);
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+      const r = e.reason;
+      clog('error', `unhandledrejection: ${r && r.message ? r.message : r}`);
+    });
+    document.addEventListener('visibilitychange', () => {
+      clog('info', `visibility: ${document.visibilityState}`);
+      if (document.visibilityState === 'hidden') clogFlush();
+    });
+    setInterval(clogFlush, CLOG_FLUSH_MS);
+
+    // Taps that don't reach their button: log what element is under the finger while evaluating.
+    document.addEventListener('pointerdown', (e) => {
+      try {
+        if (typeof evaluateInFlight === 'undefined' || !evaluateInFlight) return;
+        clog('tap', `pointerdown target=${describeEl(e.target)} top=${describeEl(document.elementFromPoint(e.clientX, e.clientY))}`);
+      } catch (_) {}
+    }, true);
+
+    (function logStartup() {
+      let standalone = false;
+      try { standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; } catch (_) {}
+      const ua = navigator.userAgent || '';
+      const webview = /; wv\)|FBAN|FBAV|Instagram|WhatsApp|Line\//i.test(ua);
+      clog('info', `startup version=${APP_VERSION} secure=${window.isSecureContext} standalone=${standalone} webviewGuess=${webview}`);
+      clog('info', `ua=${ua}`);
+      clog('info', `viewport=${window.innerWidth}x${window.innerHeight} dpr=${window.devicePixelRatio} api=${window.location.protocol === 'file:' || !window.location.host ? 'http://localhost:8000/api/evaluate' : '/api/evaluate'}`);
+    })();
+  </script>
+  <script>
+    // --- CONFIGURATION ---
+    const SUPABASE_URL = 'https://bitkjopgmzafulwpsmul.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_R2HVlGpwG5GN0ThCic7RMg_bQVHXjFU';
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // Existing Supabase table where incidents (photo + result) are saved
+    const SUPABASE_RESULTS_TABLE = 'Incidente';
+
+    // Endpoint pointing to your FastAPI / Backend orchestrator
+    const BACKEND_API_URL = (window.location.protocol === 'file:' || !window.location.host)
+      ? 'http://localhost:8000/api/evaluate'
+      : '/api/evaluate';
+
+    const authSection = document.getElementById('authSection');
+    const cameraSection = document.getElementById('cameraSection');
+    const authTitle = document.getElementById('authTitle');
+    const emailLabel = document.getElementById('emailLabel');
+    const passwordLabel = document.getElementById('passwordLabel');
+    const emailInput = document.getElementById('emailInput');
+    const passwordInput = document.getElementById('passwordInput');
+    const authSubmitBtn = document.getElementById('authSubmitBtn');
+    const switchText = document.getElementById('switchText');
+    const toggleAuthMode = document.getElementById('toggleAuthMode');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const historyBtn = document.getElementById('historyBtn');
+    const historySection = document.getElementById('historySection');
+    const historyList = document.getElementById('historyList');
+    const historyStatus = document.getElementById('historyStatus');
+    const historyMoreBtn = document.getElementById('historyMoreBtn');
+    const imageOverlay = document.getElementById('imageOverlay');
+    const imageOverlayImg = document.getElementById('imageOverlayImg');
+
+    const video = document.getElementById('cameraStream');
+    const canvas = document.getElementById('photoCanvas');
+    const captureBtn = document.getElementById('captureBtn');
+    const retakeBtn = document.getElementById('retakeBtn');
+    const confirmBtn = document.getElementById('confirmBtn');
+    const previewContainer = document.getElementById('previewContainer');
+    const capturedImage = document.getElementById('capturedImage');
+    const viewfinder = document.getElementById('viewfinder');
+    const termsCheckbox = document.getElementById('termsCheckbox');
+    const siteWrapper = document.getElementById('siteWrapper');
+
+    // Result Card Elements
+    const resultCard = document.getElementById('resultCard');
+    const resultHeaderTitle = document.getElementById('resultHeaderTitle');
+    const dbStatusBadge = document.getElementById('dbStatusBadge');
+    const jevDegree = document.getElementById('jevDegree');
+    const jevSeverity = document.getElementById('jevSeverity');
+    const jevTransfer = document.getElementById('jevTransfer');
+    const probList = document.getElementById('probList');
+    
+    const settingsBtn = document.getElementById('settingsBtn');
+    const dropdownMenu = document.getElementById('dropdownMenu');
+    const guideBtn = document.getElementById('guideBtn');
+    const aboutBtn = document.getElementById('aboutBtn');
+    const zoomBtn = document.getElementById('zoomBtn');
+    const zoomIcon = document.getElementById('zoomIcon');
+    const themeBtn = document.getElementById('themeBtn');
+    const themeIcon = document.getElementById('themeIcon');
+    const langBtn = document.getElementById('langBtn');
+    const infoBox = document.getElementById('infoBox');
+    const infoTitle = document.getElementById('infoTitle');
+    const infoContent = document.getElementById('infoContent');
+    const closeInfoBtn = document.getElementById('closeInfoBtn');
+
+    let streamObj = null;
+    let currentFacingMode = 'environment';
+    let cameraBusy = false;
+    let cameraOverlayKind = null;
+    let cameraPermStatus = null;
+    const switchCameraBtn = document.getElementById('switchCameraBtn');
+    let currentLang = 'ro';
+    let isDarkMode = true;
+    let isRegisterMode = false;
+    let zoomState = 'normal';
+    let currentUser = null;
+    let lastResultData = null;
+    const HISTORY_PAGE_SIZE = 10;
+    let historyRows = [];
+    let historyLoading = false;
+    let historyHasMore = false;
+    let historyError = false;
+
+    const translations = {
+      ro: {
+        subtitle: "Analiză de prim ajutor",
+        guideBtn: "Ghid de captură",
+        aboutBtn: "Despre CromerCare",
+        zoomIn: "Zoom In (+)",
+        zoomOut: "Zoom Out (-)",
+        langBtn: "English",
+        themeLight: "Light Mode",
+        themeDark: "Dark Mode",
+        logout: "Deconectare",
+        emailLabel: "Email",
+        passwordLabel: "Parolă",
+        disclaimer: "Înțeleg și accept în mod expres că această platformă NU oferă un diagnostic medical real și că rezultatele pot fi eronate.",
+        viewfinder: "Poziționează leziunea aici",
+        captureBtn: "Fă Poză Leziune",
+        switchCameraBtn: "Schimbă camera",
+        switchCameraFail: "Nu s-a putut schimba camera",
+        retakeBtn: "Fă altă poză",
+        confirmBtn: "Analizează poza",
+        hospitalTitle: "Cel mai apropiat spital",
+        hospitalUrgent: "Este necesar transferul imediat. Mergeți urgent la spital sau sunați la 112.",
+        hospitalDirections: "Deschide indicațiile",
+        hospitalMapHint: "Atinge harta pentru indicații în Google Maps",
+        hospitalDistance: "Distanță aproximativă",
+        hospitalDenied: "Accesul la locație a fost refuzat. Puteți căuta manual un spital.",
+        hospitalTimeout: "Locația nu a putut fi obținută la timp.",
+        hospitalUnavailable: "Locația nu este disponibilă.",
+        hospitalUnsupported: "Browserul nu acceptă geolocalizarea.",
+        hospitalUnnamed: "Spital fără nume",
+        hospitalNoResult: "Nu a fost găsit niciun spital în apropiere.",
+        hospitalServiceError: "Serviciul de hărți sau de căutare nu este disponibil momentan. Încercați din nou.",
+        badgeSaved: "Imagine capturată",
+        zoomIn: "Mărește",
+        zoomOut: "Micșorează",
+        zoomReset: "Resetează zoom",
+        authTitleLogin: "Autentificare Pacient",
+        authTitleRegister: "Creare Cont Nou",
+        authBtnLogin: "Conectare",
+        authBtnRegister: "Înregistrare",
+        switchTextLogin: "Nu ai un cont?",
+        switchLinkLogin: "Creează un cont nou",
+        switchTextRegister: "Ai deja un cont?",
+        switchLinkRegister: "Conectează-te aici",
+        guideTitle: "Ghid de captură",
+        guideContent: "Asigură-te că zona afectată este bine luminată, clar vizibilă și încadrată corespunzător în cercul punctat de pe ecran înainte de a face fotografia.",
+        aboutTitle: "Despre CromerCare",
+        aboutContent: "CromerCare - Aplicație inovatoare de triaj și prim ajutor asistată de inteligență artificială pentru evaluarea rapidă a leziunilor.",
+        analyzingText: "Se analizează poza...",
+        stepPreparing: "Pregătire imagine...",
+        stepSending: "Se trimite la server...",
+        stepAnalyzing: "Se analizează (JEV)...",
+        pingChecking: "Se verifică serverul...",
+        cancelBtn: "Anulează",
+        alertServerUnreachable: "Serverul nu poate fi contactat (tunelul este oprit sau adresa este veche). Verifică conexiunea sau redeschide linkul nou.",
+        savingText: "Se salvează rezultatul...",
+        resultHeader: "Rezultat analiză",
+        dbSavedBadge: "Salvat în cloud ✓",
+        dbErrorBadge: "Eroare salvare DB",
+        alertCameraError: "Nu s-a putut accesa camera. Verifică permisiunile în browser.",
+        camEnableBtn: "Activează camera",
+        camRetryBtn: "Reîncearcă",
+        camMsgPrompt: "Pentru a face poza, aplicația are nevoie de acces la cameră.",
+        camMsgDenied: "Accesul la cameră este blocat.",
+        camStepsAndroid: "Atinge pictograma din stânga barei de adrese, apoi Permisiuni → Cameră → Permite. După aceea apasă Reîncearcă.",
+        camStepsIos: "Atinge aA din bara de adrese, apoi Setări site → Cameră → Permite. După aceea apasă Reîncearcă.",
+        camStepsDesktop: "Apasă pictograma camerei din bara de adrese, permite accesul, apoi apasă Reîncearcă.",
+        camMsgBusy: "Camera este folosită de altă aplicație sau nu poate porni. Închide celelalte aplicații care o folosesc și apasă Reîncearcă.",
+        camMsgNotFound: "Nu s-a găsit nicio cameră pe acest dispozitiv.",
+        camMsgInsecure: "Camera funcționează doar pe o conexiune sigură. Deschide aplicația prin HTTPS sau pe localhost.",
+        camMsgEnded: "Camera s-a oprit. Apasă Reîncearcă pentru a o porni din nou.",
+        camMsgError: "Nu s-a putut accesa camera. Apasă Reîncearcă.",
+        alertCheckboxError: "Te rugăm să bifezi căsuța de acceptare a termenilor înainte de a face poza.",
+        alertLowBrightness: "Imaginea este prea întunecată. Te rugăm să refaci poza folosind blițul sau într-un loc mai bine luminat.",
+        alertMlError: "Eroare la conectarea cu serverul backend. Asigură-te că API-ul rulează.",
+        alertNetworkTimeout: "Conexiunea cu serverul a fost întreruptă sau a durat prea mult. Încearcă din nou.",
+        alertImageError: "Nu s-a putut pregăti imaginea pentru trimitere. Refă poza și încearcă din nou.",
+        qTitle: "Chestionar Anamneză",
+        q0Label: "2. Cât timp a durat expunerea la cauza arsurii?",
+        qAgeLabel: "4. Ce vârstă are persoana afectată?",
+        q1Label: "3. Selectați gradul de durere resimțit la nivelul arsurii?",
+        q2Label: "5. Este arsura într-o zonă periculoasă/sensibilă (palme, tălpi, față, gât, zona genitală)?",
+        q3Label: "1. Care este cauza arsurii?",
+        q4Label: "6. Suprafața arsurii este mai mare de o palmă?",
+        q5Label: "7. Există vezicule (bășici) mari?",
+        exposureOptions: ["< 1 secundă", "< 10 secunde", "> 1 minut", "Expunere repetată"],
+        ageOptions: ["< 2 ani", "2–5 ani", "5–59 ani", "> 60 ani"],
+        fpWarning: "Atenție: rezultatul poate fi supraestimat față de răspunsurile la chestionar. Verificați cu un medic.",
+        fpReasons: {
+          no_burn_insufficient_evidence: "Rezultatul «fără arsură» nu este susținut de suficiente răspunsuri; se afișează cel mai probabil grad de arsură.",
+          no_burn_contradicted_by_answers: "Răspunsurile la chestionar indică o arsură, deci rezultatul «fără arsură» nu a fost acceptat.",
+          third_degree_short_exposure: "Grad III indicat, dar expunerea a fost prea scurtă pentru o arsură atât de profundă.",
+          second_degree_short_exposure: "Grad II indicat, dar expunerea a fost sub 1 secundă.",
+          sun_exposure_too_short: "Expunere la soare prea scurtă (sub 10 secunde) pentru o arsură solară.",
+          answers_inconsistent_with_image: "Răspunsurile din chestionar nu se potrivesc cu aspectul vizual al arsurii."
+        },
+        painOptions: ["0–2 (fără durere / disconfort)", "3–4 (durere ușoară)", "5–6 (durere moderată)", "7–8 (durere puternică)", "9-10 (durere insuportabilă)"],
+        yesNoOptions: ["Da", "Nu"],
+        causeOptions: ["Termică (opărire, flacără, atingere suprafață fierbinte)", "Chimică (acizi, sodă caustică, înălbitori concentrați / detergenți industriali)", "Electrică (electrocutare)", "Radiații (expunere raze UV/X)", "Altele (frecare, la căzături)", "Expunere la soare", "Nu știu ce a cauzat arsura"],
+        historyBtn: "Istoric analize",
+        historyTitle: "Istoric analize",
+        historyBack: "Înapoi",
+        historyLoading: "Se încarcă...",
+        historyEmpty: "Nu ai nicio analiză salvată încă.",
+        historyError: "Nu s-a putut încărca istoricul. Încearcă din nou.",
+        historyMore: "Încarcă mai multe",
+        historyConfidence: "Încredere:",
+        confidenceLabel: "Încredere",
+        confidenceSourceJev: "JEV",
+        confidenceSourceModel: "Model imagine",
+        historyImageAlt: "Imagine analizată",
+        jevDegreeLabel: "Clasificare JEV:",
+        jevSeverityLabel: "Scor Severitate (0-5):",
+        jevTransferLabel: "Transfer Urgent:",
+        noBurnConclusion: "Concluzie «fără arsură» bazată pe mai multe răspunsuri suspecte.",
+        inconclusiveNote: "Încrederea este sub 50%, așa că rezultatul nu este sigur.",
+        answersContradictNote: "Răspunsurile (expunere sub 1 secundă, fără bășici, suprafață mică) nu se potrivesc cu o arsură, deci nu se poate da un răspuns concret.",
+        answersNoBurnNote: "Răspunsurile la chestionar indică faptul că nu este o arsură.",
+        indicatii: {
+          go_to_hospital: "RECOMANDARE: Prezintă-te de urgență la spital / medic.\n- Acoperă zona cu un pansament steril, curat, fără a aplica unguente sau gheață.\n- Solicită evaluare medicală imediată.",
+          treat_at_home: "RECOMANDARE: Îngrijire și monitorizare la domiciliu.\n- Răcește zona cu apă călduță/rece (nu gheață) timp de 10-15 minute.\n- Aplică o cremă hidratantă/calmanta potrivită și monitorizează evoluția.",
+          nothing_to_do: "RECOMANDARE: Nu este necesară nicio intervenție.\n- Pielea nu prezintă semne care să necesite tratament; menține zona curată.",
+          see_doctor: "RECOMANDARE: Nu se poate da un răspuns concret pe baza pozei.\n- Refă poza cu lumină bună, clară și de aproape.\n- Dacă există durere, roșeață sau bășici, consultă un medic."
+        },
+        emailPlaceholder: "nume@exemplu.ro",
+        classNames: {
+          "no_burn": "Fără arsură / Piele sănătoasă",
+          "first_degree": "Arsură Gradul I",
+          "second_degree": "Arsură Gradul II",
+          "third_degree": "Arsură Gradul III",
+          "inconclusive": "Nu pot da un răspuns concret",
+          "indeterminate": "Indeterminat / Revizuiți"
+        }
+      },
+      en: {
+        subtitle: "First Aid Analysis",
+        guideBtn: "Capture Guide",
+        aboutBtn: "About CromerCare",
+        zoomIn: "Zoom In (+)",
+        zoomOut: "Zoom Out (-)",
+        langBtn: "Română",
+        themeLight: "Light Mode",
+        themeDark: "Dark Mode",
+        logout: "Log Out",
+        emailLabel: "Email",
+        passwordLabel: "Password",
+        disclaimer: "I expressly understand and accept that this platform DOES NOT provide a real medical diagnosis and that results may be inaccurate.",
+        viewfinder: "Position injury here",
+        captureBtn: "Take Injury Photo",
+        switchCameraBtn: "Switch camera",
+        switchCameraFail: "Could not switch camera",
+        retakeBtn: "Take another photo",
+        confirmBtn: "Analyze photo",
+        hospitalTitle: "Nearest hospital",
+        hospitalUrgent: "Immediate transfer is required. Go to the hospital urgently or call 112.",
+        hospitalDirections: "Open directions",
+        hospitalMapHint: "Tap the map for directions in Google Maps",
+        hospitalDistance: "Approximate distance",
+        hospitalDenied: "Location access was denied. You can search for a hospital manually.",
+        hospitalTimeout: "Your location could not be obtained in time.",
+        hospitalUnavailable: "Your location is unavailable.",
+        hospitalUnsupported: "This browser does not support geolocation.",
+        hospitalUnnamed: "Unnamed hospital",
+        hospitalNoResult: "No hospital was found nearby.",
+        hospitalServiceError: "The map or search service is unavailable right now. Please try again.",
+        badgeSaved: "Image captured",
+        zoomIn: "Zoom in",
+        zoomOut: "Zoom out",
+        zoomReset: "Reset zoom",
+        authTitleLogin: "Patient Login",
+        authTitleRegister: "Create New Account",
+        authBtnLogin: "Log In",
+        authBtnRegister: "Register",
+        switchTextLogin: "Don't have an account?",
+        switchLinkLogin: "Create a new account",
+        switchTextRegister: "Already have an account?",
+        switchLinkRegister: "Log in here",
+        guideTitle: "Capture Guide",
+        guideContent: "Ensure the affected area is well lit, clearly visible, and properly aligned within the dashed circle on screen before taking the photo.",
+        aboutTitle: "About CromerCare",
+        aboutContent: "CromerCare - Innovative AI-assisted triage and first aid application for rapid injury assessment.",
+        analyzingText: "Analyzing photo...",
+        stepPreparing: "Preparing image...",
+        stepSending: "Sending to server...",
+        stepAnalyzing: "Analyzing (JEV)...",
+        pingChecking: "Checking server...",
+        cancelBtn: "Cancel",
+        alertServerUnreachable: "The server cannot be reached (tunnel is down or the address is old). Check your connection or reopen the new link.",
+        savingText: "Saving result...",
+        resultHeader: "Analysis result",
+        dbSavedBadge: "Saved to cloud ✓",
+        dbErrorBadge: "DB Save Error",
+        alertCameraError: "Could not access the camera. Check browser permissions.",
+        camEnableBtn: "Enable camera",
+        camRetryBtn: "Retry",
+        camMsgPrompt: "The app needs camera access to take the photo.",
+        camMsgDenied: "Camera access is blocked.",
+        camStepsAndroid: "Tap the icon left of the address bar, then Permissions → Camera → Allow. Then press Retry.",
+        camStepsIos: "Tap aA in the address bar, then Website Settings → Camera → Allow. Then press Retry.",
+        camStepsDesktop: "Click the camera icon in the address bar, allow access, then press Retry.",
+        camMsgBusy: "The camera is in use by another app or cannot start. Close other apps using it and press Retry.",
+        camMsgNotFound: "No camera was found on this device.",
+        camMsgInsecure: "The camera only works on a secure connection. Open the app over HTTPS or on localhost.",
+        camMsgEnded: "The camera stopped. Press Retry to start it again.",
+        camMsgError: "Could not access the camera. Press Retry.",
+        alertCheckboxError: "Please check the disclaimer box before taking a photo.",
+        alertLowBrightness: "The image is too dark. Please retake the photo with the flash on or in better light.",
+        alertMlError: "Error connecting to backend server. Ensure API is running.",
+        alertNetworkTimeout: "The connection to the server was lost or took too long. Please try again.",
+        alertImageError: "Could not prepare the image for upload. Please retake the photo and try again.",
+        qTitle: "Anamnesis Questionnaire",
+        q0Label: "2. How long was the exposure to the cause of the burn?",
+        qAgeLabel: "4. How old is the affected person?",
+        q1Label: "3. Select the level of pain felt at the burn site:",
+        q2Label: "5. Is the burn in a dangerous/sensitive area (palms, soles, face, neck, genital area)?",
+        q3Label: "1. What is the cause of the burn?",
+        q4Label: "6. Is the burn surface larger than one palm?",
+        q5Label: "7. Are there large blisters (vesicles)?",
+        exposureOptions: ["< 1 second", "< 10 seconds", "> 1 minute", "Repeated exposure"],
+        ageOptions: ["< 2 years", "2–5 years", "5–59 years", "> 60 years"],
+        fpWarning: "Warning: the result may be overestimated compared with your questionnaire answers. Please check with a doctor.",
+        fpReasons: {
+          no_burn_insufficient_evidence: "The “no burn” result is not supported by enough answers; the most likely burn grade is shown instead.",
+          no_burn_contradicted_by_answers: "Your questionnaire answers indicate a burn, so the “no burn” result was not accepted.",
+          third_degree_short_exposure: "Grade III suggested, but the exposure was too short for such a deep burn.",
+          second_degree_short_exposure: "Grade II suggested, but the exposure was under 1 second.",
+          sun_exposure_too_short: "Sun exposure was too short (under 10 seconds) for a sunburn.",
+          answers_inconsistent_with_image: "Questionnaire answers do not match the visual appearance of the burn."
+        },
+        painOptions: ["0–2 (no pain / discomfort)", "3–4 (mild pain)", "5–6 (moderate pain)", "7–8 (severe pain)", "9-10 (unbearable pain)"],
+        yesNoOptions: ["Yes", "No"],
+        causeOptions: ["Thermal (scald, flame, contact with a hot surface)", "Chemical (acids, caustic soda, concentrated bleach / industrial detergents)", "Electrical (electric shock)", "Radiation (UV/X-ray exposure)", "Other (friction, falls)", "Sun exposure", "I don't know what caused the burn"],
+        historyBtn: "My history",
+        historyTitle: "My history",
+        historyBack: "Back",
+        historyLoading: "Loading...",
+        historyEmpty: "You have no saved analyses yet.",
+        historyError: "Could not load your history. Please try again.",
+        historyMore: "Load more",
+        historyConfidence: "Confidence:",
+        confidenceLabel: "Confidence",
+        confidenceSourceJev: "JEV",
+        confidenceSourceModel: "Image model",
+        historyImageAlt: "Analyzed image",
+        jevDegreeLabel: "JEV Classification:",
+        jevSeverityLabel: "Severity Score (0-5):",
+        jevTransferLabel: "Urgent Transfer:",
+        noBurnConclusion: "\"No burn\" conclusion based on several suspicious answers.",
+        inconclusiveNote: "Confidence is below 50%, so the result is not reliable.",
+        answersContradictNote: "The answers (exposure under 1 second, no blisters, small area) do not match a burn, so no definite answer can be given.",
+        answersNoBurnNote: "The questionnaire answers indicate that this is not a burn.",
+        indicatii: {
+          go_to_hospital: "RECOMMENDATION: Go to the hospital / a doctor urgently.\n- Cover the area with a clean, sterile dressing, without applying ointments or ice.\n- Seek immediate medical evaluation.",
+          treat_at_home: "RECOMMENDATION: Care and monitoring at home.\n- Cool the area with lukewarm/cool water (not ice) for 10-15 minutes.\n- Apply a suitable moisturizing/soothing cream and monitor how it evolves.",
+          nothing_to_do: "RECOMMENDATION: No intervention is needed.\n- The skin shows no signs that require treatment; keep the area clean.",
+          see_doctor: "RECOMMENDATION: No definite answer can be given from the photo.\n- Retake the photo in good, clear light and from close up.\n- If there is pain, redness or blisters, see a doctor."
+        },
+        emailPlaceholder: "name@example.com",
+        classNames: {
+          "no_burn": "No Burn / Healthy Skin",
+          "first_degree": "1st Degree Burn",
+          "second_degree": "2nd Degree Burn",
+          "third_degree": "3rd Degree Burn",
+          "inconclusive": "No definite answer possible",
+          "indeterminate": "Indeterminate / Review"
+        }
+      }
+    };
+
+    function updateLanguage(lang) {
+      currentLang = lang;
+      const t = translations[lang];
+
+      document.getElementById('subtitleText').innerText = t.subtitle;
+      document.getElementById('guideBtnText').innerText = t.guideBtn;
+      document.getElementById('aboutBtnText').innerText = t.aboutBtn;
+      document.getElementById('langBtnText').innerText = t.langBtn;
+      document.getElementById('logoutBtnText').innerText = t.logout;
+      document.getElementById('historyBtnText').textContent = t.historyBtn;
+      [['imageZoomIn', t.zoomIn], ['imageZoomOut', t.zoomOut], ['imageZoomReset', t.zoomReset]].forEach(([id, label]) => {
+        const b = document.getElementById(id);
+        b.setAttribute('aria-label', label);
+        b.title = label;
+      });
+      document.getElementById('historyTitle').textContent = t.historyTitle;
+      renderCameraOverlay();
+      document.getElementById('historyBackText').textContent = t.historyBack;
+      renderHistory();
+      document.getElementById('themeBtnText').innerText = isDarkMode ? t.themeLight : t.themeDark;
+      resultHeaderTitle.innerText = t.resultHeader;
+      
+      emailLabel.innerText = t.emailLabel;
+      passwordLabel.innerText = t.passwordLabel;
+
+      // Questionnaire text updates
+      document.getElementById('qTitle').textContent = t.qTitle;
+      document.getElementById('q0Label').textContent = t.q0Label;
+      document.getElementById('qAgeLabel').textContent = t.qAgeLabel;
+      document.getElementById('q1Label').textContent = t.q1Label;
+      document.getElementById('q2Label').textContent = t.q2Label;
+      document.getElementById('q3Label').textContent = t.q3Label;
+      document.getElementById('q4Label').textContent = t.q4Label;
+      document.getElementById('q5Label').textContent = t.q5Label;
+      // Translate visible option text only; option values stay Romanian for the backend
+      const setOptionText = (selectId, labels) => {
+        document.querySelectorAll(`#${selectId} option`).forEach((opt, i) => {
+          if (labels[i]) opt.textContent = labels[i];
+        });
+      };
+      setOptionText('q0_exposure', t.exposureOptions);
+      setOptionText('q_age', t.ageOptions);
+      setOptionText('q1_pain', t.painOptions);
+      setOptionText('q2_sensitive', t.yesNoOptions);
+      setOptionText('q3_cause', t.causeOptions);
+      setOptionText('q4_size', t.yesNoOptions);
+      setOptionText('q5_blisters', t.yesNoOptions);
+      if (typeof window.refreshOptionPicker === 'function') window.refreshOptionPicker();
+      document.getElementById('jevDegreeLabel').textContent = t.jevDegreeLabel;
+      document.getElementById('jevSeverityLabel').textContent = t.jevSeverityLabel;
+      document.getElementById('jevTransferLabel').textContent = t.jevTransferLabel;
+      emailInput.placeholder = t.emailPlaceholder;
+
+      updateZoomButtonText();
+      updateAuthUI();
+
+      document.getElementById('disclaimerLabel').innerText = t.disclaimer;
+      document.getElementById('captureBtnText').innerText = t.captureBtn;
+      document.getElementById('switchCameraBtnText').innerText = t.switchCameraBtn;
+      if (typeof renderCameraToast === 'function') renderCameraToast();
+      document.getElementById('retakeBtnText').innerText = t.retakeBtn;
+      document.getElementById('confirmBtnText').innerText = t.confirmBtn;
+      document.getElementById('cancelEvalBtnText').innerText = t.cancelBtn;
+      document.getElementById('badgeSaved').innerHTML = `<i class="fa-solid fa-check"></i> ${t.badgeSaved}`;
+      viewfinder.setAttribute('data-label', t.viewfinder);
+
+      if (lastResultData) {
+        renderResults(lastResultData);
+      }
+      renderHospitalCard();
+    }
+
+    function updateZoomButtonText() {
+      const t = translations[currentLang];
+      const zoomBtnText = document.getElementById('zoomBtnText');
+      if (zoomState === 'normal') {
+        zoomBtnText.innerText = t.zoomIn;
+        zoomIcon.className = "fa-solid fa-magnifying-glass-plus";
+      } else if (zoomState === 'zoomed-in') {
+        zoomBtnText.innerText = t.zoomOut;
+        zoomIcon.className = "fa-solid fa-magnifying-glass-minus";
+      } else if (zoomState === 'zoomed-out') {
+        zoomBtnText.innerText = t.zoomIn;
+        zoomIcon.className = "fa-solid fa-magnifying-glass-plus";
+      }
+    }
+
+    function updateAuthUI() {
+      const t = translations[currentLang];
+      if (isRegisterMode) {
+        authTitle.innerText = t.authTitleRegister;
+        authSubmitBtn.innerText = t.authBtnRegister;
+        switchText.innerText = t.switchTextRegister;
+        toggleAuthMode.innerText = t.switchLinkRegister;
+      } else {
+        authTitle.innerText = t.authTitleLogin;
+        authSubmitBtn.innerText = t.authBtnLogin;
+        switchText.innerText = t.switchTextLogin;
+        toggleAuthMode.innerText = t.switchLinkLogin;
+      }
+    }
+
+    toggleAuthMode.addEventListener('click', () => {
+      isRegisterMode = !isRegisterMode;
+      updateAuthUI();
+    });
+
+    authSubmitBtn.addEventListener('click', async () => {
+      const email = emailInput.value.trim();
+      const password = passwordInput.value.trim();
+
+      if (!email || !password) {
+        notify(currentLang === 'ro' ? "Te rugăm să introduci email-ul și parola." : "Please enter email and password.");
+        return;
+      }
+
+      authSubmitBtn.disabled = true;
+
+      if (isRegisterMode) {
+        const { data, error } = await _supabase.auth.signUp({ email, password });
+        if (error) {
+          notify("Eroare la creare cont: " + error.message, "signup error");
+        } else {
+          if (data.session) {
+            currentUser = data.session.user;
+            showCameraUI();
+          } else {
+            const loginRes = await _supabase.auth.signInWithPassword({ email, password });
+            if (loginRes.data.user) {
+              currentUser = loginRes.data.user;
+              showCameraUI();
+            }
+          }
+        }
+      } else {
+        const { data, error } = await _supabase.auth.signInWithPassword({ email, password });
+        if (error) {
+          notify("Eroare la autentificare: " + error.message, "login error");
+        } else {
+          currentUser = data.user;
+          showCameraUI();
+        }
+      }
+      authSubmitBtn.disabled = false;
+    });
+
+    logoutBtn.addEventListener('click', async () => {
+      await _supabase.auth.signOut();
+      currentUser = null;
+      dropdownMenu.classList.remove('show');
+      showAuthUI();
+    });
+
+    function resetHistory() {
+      historyRows = [];
+      historyLoading = false;
+      historyHasMore = false;
+      historyError = false;
+      renderHistory();
+    }
+
+    const imageOverlayCaption = document.getElementById('imageOverlayCaption');
+
+    const imageStage = document.getElementById('imageOverlayStage');
+    const MIN_ZOOM = 1, MAX_ZOOM = 5, DOUBLE_TAP_ZOOM = 2.5;
+    let zoomScale = 1, zoomX = 0, zoomY = 0;
+    const activePointers = new Map();
+    let pinchStart = null, panStart = null, tapInfo = null, lastTap = null;
+
+    function clampPan() {
+      const w = imageOverlayImg.offsetWidth * zoomScale;
+      const h = imageOverlayImg.offsetHeight * zoomScale;
+      const maxX = Math.max(0, (w - imageStage.clientWidth) / 2);
+      const maxY = Math.max(0, (h - imageStage.clientHeight) / 2);
+      zoomX = Math.min(maxX, Math.max(-maxX, zoomX));
+      zoomY = Math.min(maxY, Math.max(-maxY, zoomY));
+    }
+
+    function applyZoom() {
+      if (zoomScale <= MIN_ZOOM) { zoomScale = MIN_ZOOM; zoomX = 0; zoomY = 0; }
+      clampPan();
+      imageOverlayImg.style.transform = `translate(${zoomX}px, ${zoomY}px) scale(${zoomScale})`;
+      imageStage.classList.toggle('zoomed', zoomScale > MIN_ZOOM);
+      document.getElementById('imageZoomOut').disabled = zoomScale <= MIN_ZOOM;
+      document.getElementById('imageZoomReset').disabled = zoomScale <= MIN_ZOOM;
+      document.getElementById('imageZoomIn').disabled = zoomScale >= MAX_ZOOM;
+    }
+
+    function resetZoom() {
+      zoomScale = 1; zoomX = 0; zoomY = 0;
+      activePointers.clear();
+      pinchStart = null; panStart = null; tapInfo = null; lastTap = null;
+      imageStage.classList.remove('dragging');
+      applyZoom();
+    }
+
+    // Zoom keeping the image point under (clientX, clientY) fixed.
+    function zoomAt(clientX, clientY, newScale) {
+      newScale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, newScale));
+      const rect = imageStage.getBoundingClientRect();
+      const px = clientX - (rect.left + rect.width / 2);
+      const py = clientY - (rect.top + rect.height / 2);
+      const k = newScale / zoomScale;
+      zoomX = px - (px - zoomX) * k;
+      zoomY = py - (py - zoomY) * k;
+      zoomScale = newScale;
+      applyZoom();
+    }
+
+    function zoomCenter(factor) {
+      const rect = imageStage.getBoundingClientRect();
+      zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, zoomScale * factor);
+    }
+
+    function pointerDistance() {
+      const [a, b] = [...activePointers.values()];
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    }
+
+    function pointerMid() {
+      const [a, b] = [...activePointers.values()];
+      return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    }
+
+    imageStage.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      try { imageStage.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (activePointers.size === 1) {
+        tapInfo = { x: e.clientX, y: e.clientY, time: Date.now(), moved: false, onImage: e.target === imageOverlayImg };
+        panStart = { x: e.clientX, y: e.clientY, zx: zoomX, zy: zoomY };
+      } else if (activePointers.size === 2) {
+        tapInfo = null; panStart = null;
+        const mid = pointerMid();
+        pinchStart = { dist: pointerDistance() || 1, scale: zoomScale, mid };
+      }
+    });
+
+    imageStage.addEventListener('pointermove', (e) => {
+      if (!activePointers.has(e.pointerId)) return;
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (activePointers.size >= 2 && pinchStart) {
+        const mid = pointerMid();
+        const target = pinchStart.scale * (pointerDistance() / pinchStart.dist);
+        zoomAt(mid.x, mid.y, target);
+        // follow the movement of the pinch midpoint
+        zoomX += mid.x - pinchStart.mid.x;
+        zoomY += mid.y - pinchStart.mid.y;
+        pinchStart.mid = mid;
+        applyZoom();
+      } else if (panStart && activePointers.size === 1) {
+        const dx = e.clientX - panStart.x;
+        const dy = e.clientY - panStart.y;
+        if (tapInfo && Math.hypot(dx, dy) > 8) tapInfo.moved = true;
+        if (zoomScale > MIN_ZOOM) {
+          zoomX = panStart.zx + dx;
+          zoomY = panStart.zy + dy;
+          imageStage.classList.add('dragging');
+          applyZoom();
+        }
+      }
+    });
+
+    function endPointer(e) {
+      if (!activePointers.has(e.pointerId)) return;
+      activePointers.delete(e.pointerId);
+      imageStage.classList.remove('dragging');
+      if (activePointers.size === 1) {
+        // continue panning with the remaining finger
+        const [p] = [...activePointers.values()];
+        panStart = { x: p.x, y: p.y, zx: zoomX, zy: zoomY };
+        pinchStart = null;
+        tapInfo = null;
+        return;
+      }
+      if (activePointers.size > 0) return;
+      pinchStart = null; panStart = null;
+      const tap = tapInfo;
+      tapInfo = null;
+      if (e.type !== 'pointerup' || !tap || tap.moved || Date.now() - tap.time > 400) { lastTap = null; return; }
+      if (!tap.onImage) {
+        lastTap = null;
+        if (zoomScale <= MIN_ZOOM) closeImageOverlay();
+        return;
+      }
+      const now = Date.now();
+      if (lastTap && now - lastTap.time < 350 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30) {
+        lastTap = null;
+        if (zoomScale > MIN_ZOOM) { zoomScale = 1; applyZoom(); }
+        else zoomAt(e.clientX, e.clientY, DOUBLE_TAP_ZOOM);
+      } else {
+        lastTap = { time: now, x: e.clientX, y: e.clientY };
+      }
+    }
+    imageStage.addEventListener('pointerup', endPointer);
+    imageStage.addEventListener('pointercancel', endPointer);
+
+    imageStage.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      zoomAt(e.clientX, e.clientY, zoomScale * Math.exp(-e.deltaY * 0.0015));
+    }, { passive: false });
+
+    document.getElementById('imageZoomIn').addEventListener('click', () => zoomCenter(1.5));
+    document.getElementById('imageZoomOut').addEventListener('click', () => zoomCenter(1 / 1.5));
+    document.getElementById('imageZoomReset').addEventListener('click', resetZoom);
+    imageOverlayImg.addEventListener('load', applyZoom);
+    window.addEventListener('resize', () => { if (imageOverlay.classList.contains('show')) applyZoom(); });
+
+    function openImageOverlay(src, caption) {
+      resetZoom();
+      imageOverlayImg.src = src;
+      imageOverlayCaption.textContent = caption || '';
+      imageOverlayCaption.style.display = caption ? '' : 'none';
+      imageOverlay.classList.add('show');
+      const req = imageOverlay.requestFullscreen || imageOverlay.webkitRequestFullscreen;
+      if (req) {
+        try {
+          const p = req.call(imageOverlay);
+          if (p && p.catch) p.catch(() => {});
+        } catch (e) { /* fixed overlay is the fallback */ }
+      }
+    }
+
+    function closeImageOverlay() {
+      imageOverlay.classList.remove('show');
+      imageOverlayImg.removeAttribute('src');
+      resetZoom();
+      const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+      if (fsEl === imageOverlay) {
+        const exit = document.exitFullscreen || document.webkitExitFullscreen;
+        try {
+          const p = exit && exit.call(document);
+          if (p && p.catch) p.catch(() => {});
+        } catch (e) { /* ignore */ }
+      }
+    }
+
+    document.getElementById('imageOverlayClose').addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeImageOverlay();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && imageOverlay.classList.contains('show')) closeImageOverlay();
+    });
+    function onFullscreenChange() {
+      const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+      if (!fsEl && imageOverlay.classList.contains('show') && imageOverlay.dataset.wasFs === '1') closeImageOverlay();
+      imageOverlay.dataset.wasFs = fsEl === imageOverlay ? '1' : '0';
+    }
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+
+    capturedImage.addEventListener('click', () => {
+      if (!capturedImage.getAttribute('src')) return;
+      const jev = (lastResultData && lastResultData.jev_decision) || {};
+      const cls = jev.burn_degree_classification;
+      const caption = cls ? (translations[currentLang].classNames[cls] || cls) : '';
+      openImageOverlay(capturedImage.src, caption);
+    });
+
+    function historyImageSrc(value) {
+      if (typeof value !== 'string') return null;
+      if (value.startsWith('data:image/')) return value;
+      if (value.length >= 100 && /^[A-Za-z0-9+/=\s]+$/.test(value)) return 'data:image/jpeg;base64,' + value.replace(/\s+/g, '');
+      return null;
+    }
+
+    function renderHistory() {
+      const t = translations[currentLang];
+      const locale = currentLang === 'ro' ? 'ro-RO' : 'en-GB';
+      historyList.replaceChildren();
+
+      historyRows.forEach(row => {
+        const card = document.createElement('div');
+        card.className = 'history-card';
+
+        const src = historyImageSrc(row.image_base64);
+        if (src) {
+          const img = document.createElement('img');
+          img.className = 'history-thumb';
+          img.alt = t.historyImageAlt;
+          img.src = src;
+          card.appendChild(img);
+        } else {
+          const placeholder = document.createElement('div');
+          placeholder.className = 'history-thumb-empty';
+          card.appendChild(placeholder);
+        }
+
+        const info = document.createElement('div');
+        info.className = 'history-info';
+
+        const cls = document.createElement('span');
+        cls.className = 'history-class';
+        cls.textContent = t.classNames[row.grad_arsura] || row.grad_arsura || '-';
+        info.appendChild(cls);
+
+        const date = document.createElement('span');
+        const d = new Date(row.data_crearii);
+        date.textContent = isNaN(d.getTime()) ? '-' : d.toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' });
+        info.appendChild(date);
+
+        const conf = document.createElement('span');
+        const c = Number(row.incredere);
+        conf.textContent = `${t.historyConfidence} ${row.incredere == null || isNaN(c) ? '-' : (c * 100).toFixed(1) + '%'}`;
+        info.appendChild(conf);
+
+        card.appendChild(info);
+        if (src) {
+          const caption = [cls.textContent, date.textContent, conf.textContent].join(' | ');
+          card.setAttribute('role', 'button');
+          card.tabIndex = 0;
+          card.addEventListener('click', () => openImageOverlay(src, caption));
+          card.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openImageOverlay(src, caption); }
+          });
+        }
+        historyList.appendChild(card);
+      });
+
+      if (historyLoading) {
+        historyStatus.textContent = t.historyLoading;
+      } else if (historyError) {
+        historyStatus.textContent = t.historyError;
+      } else if (historyRows.length === 0) {
+        historyStatus.textContent = t.historyEmpty;
+      } else {
+        historyStatus.textContent = '';
+      }
+      historyStatus.style.display = historyStatus.textContent ? 'block' : 'none';
+
+      historyMoreBtn.textContent = t.historyMore;
+      historyMoreBtn.style.display = historyHasMore && !historyLoading ? 'block' : 'none';
+    }
+
+    async function loadHistoryPage() {
+      if (!currentUser || historyLoading) return;
+      historyLoading = true;
+      historyError = false;
+      renderHistory();
+      const from = historyRows.length;
+      try {
+        const { data, error } = await _supabase
+          .from(SUPABASE_RESULTS_TABLE)
+          .select('id, data_crearii, grad_arsura, incredere, image_base64')
+          .eq('user_id', currentUser.id)
+          .order('data_crearii', { ascending: false })
+          .range(from, from + HISTORY_PAGE_SIZE - 1);
+        if (error) throw error;
+        historyRows = historyRows.concat(data || []);
+        historyHasMore = (data || []).length === HISTORY_PAGE_SIZE;
+      } catch (err) {
+        console.error('History load error:', err);
+        historyError = true;
+        historyHasMore = false;
+      } finally {
+        historyLoading = false;
+        renderHistory();
+      }
+    }
+
+    historyBtn.addEventListener('click', () => {
+      dropdownMenu.classList.remove('show');
+      cameraSection.classList.remove('active');
+      historySection.classList.add('active');
+      resetHistory();
+      loadHistoryPage();
+    });
+
+    const historyBackBtn = document.getElementById('historyBackBtn');
+    historyBackBtn.addEventListener('click', () => {
+      historySection.classList.remove('active');
+      cameraSection.classList.add('active');
+    });
+
+    historyMoreBtn.addEventListener('click', loadHistoryPage);
+
+    function showCameraUI() {
+      authSection.classList.remove('active');
+      historySection.classList.remove('active');
+      cameraSection.classList.add('active');
+      logoutBtn.style.display = 'flex';
+      historyBtn.style.display = 'flex';
+      autoStartCamera();
+    }
+
+    function showAuthUI() {
+      cameraSection.classList.remove('active');
+      authSection.classList.add('active');
+      logoutBtn.style.display = 'none';
+      historyBtn.style.display = 'none';
+      historySection.classList.remove('active');
+      resetHistory();
+      stopCamera();
+      hideCameraOverlay();
+    }
+
+    zoomBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdownMenu.classList.remove('show');
+
+      if (zoomState === 'normal') {
+        siteWrapper.style.transform = 'scale(1.15)';
+        zoomState = 'zoomed-in';
+      } else if (zoomState === 'zoomed-in') {
+        siteWrapper.style.transform = 'scale(0.88)';
+        zoomState = 'zoomed-out';
+      } else if (zoomState === 'zoomed-out') {
+        siteWrapper.style.transform = 'scale(1)';
+        zoomState = 'normal';
+      }
+      updateZoomButtonText();
+    });
+
+    themeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdownMenu.classList.remove('show');
+      isDarkMode = !isDarkMode;
+      
+      const t = translations[currentLang];
+      if (isDarkMode) {
+        document.body.classList.remove('light-mode');
+        themeIcon.className = "fa-solid fa-sun";
+        document.getElementById('themeBtnText').innerText = t.themeLight;
+      } else {
+        document.body.classList.add('light-mode');
+        themeIcon.className = "fa-solid fa-moon";
+        document.getElementById('themeBtnText').innerText = t.themeDark;
+      }
+    });
+
+    termsCheckbox.addEventListener('change', () => {
+      if (termsCheckbox.checked) {
+        captureBtn.removeAttribute('disabled');
+      } else {
+        captureBtn.setAttribute('disabled', 'true');
+      }
+    });
+
+    settingsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdownMenu.classList.toggle('show');
+    });
+
+    window.addEventListener('click', () => {
+      if (dropdownMenu.classList.contains('show')) {
+        dropdownMenu.classList.remove('show');
+      }
+    });
+
+    function showInfo(iconName, title, content) {
+      const icon = document.createElement('i');
+      icon.className = 'fa-solid fa-' + iconName;
+      infoTitle.textContent = '';
+      infoTitle.appendChild(icon);
+      infoTitle.appendChild(document.createTextNode(' ' + title));
+      infoContent.textContent = content;
+      infoBox.classList.add('show');
+    }
+
+    guideBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdownMenu.classList.remove('show');
+      const t = translations[currentLang];
+      showInfo('book-open', t.guideTitle, t.guideContent);
+    });
+
+    aboutBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdownMenu.classList.remove('show');
+      const t = translations[currentLang];
+      showInfo('circle-info', t.aboutTitle, t.aboutContent);
+    });
+
+    langBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdownMenu.classList.remove('show');
+      const nextLang = currentLang === 'ro' ? 'en' : 'ro';
+      updateLanguage(nextLang);
+    });
+
+    closeInfoBtn.addEventListener('click', () => {
+      infoBox.classList.remove('show');
+    });
+    infoBox.addEventListener('click', (e) => {
+      if (e.target === infoBox) infoBox.classList.remove('show');
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') infoBox.classList.remove('show');
+    });
+
+    function isMobileDevice() {
+      if (navigator.userAgentData && typeof navigator.userAgentData.mobile === 'boolean') {
+        return navigator.userAgentData.mobile;
+      }
+      const uaMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
+      const coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+      // iPadOS can report a desktop UA, so accept coarse pointer with touch points too.
+      return uaMobile || (coarse && navigator.maxTouchPoints > 0);
+    }
+
+    let canSwitchCamera = false;
+
+    function updateSwitchCameraVisibility() {
+      const previewing = retakeBtn.style.display !== 'none';
+      switchCameraBtn.style.display = (canSwitchCamera && !previewing) ? 'flex' : 'none';
+    }
+
+    async function refreshCameraSwitchSupport() {
+      canSwitchCamera = false;
+      try {
+        if (isMobileDevice() && navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          canSwitchCamera = devices.filter(d => d.kind === 'videoinput').length > 1;
+        }
+      } catch (e) {
+        canSwitchCamera = false;
+      }
+      updateSwitchCameraVisibility();
+    }
+
+    const CAMERA_VIDEO_BASE = { width: { ideal: 1280 }, height: { ideal: 720 } };
+    const FRONT_LABEL_RE = /front|user|selfie|față/i;
+    const FRAME_TIMEOUT_MS = 3000;
+    let cameraToastTimer = null;
+    let cameraToastVisible = false;
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function isBusyError(err) {
+      const name = err && err.name;
+      return name === 'NotReadableError' || name === 'AbortError' || name === 'TrackStartError';
+    }
+
+    function stopStream(stream) {
+      if (stream) stream.getTracks().forEach(track => track.stop());
+    }
+
+    // getUserMedia with a single retry after 600 ms while the hardware is still being released.
+    async function openCamera(videoConstraints) {
+      const request = () => navigator.mediaDevices.getUserMedia({
+        video: { ...videoConstraints, ...CAMERA_VIDEO_BASE },
+        audio: false
+      });
+      try {
+        return await request();
+      } catch (err) {
+        if (!isBusyError(err)) throw err;
+        await sleep(600);
+        return request();
+      }
+    }
+
+    // Resolves true once the video element shows real frames, false if none arrive in time.
+    async function waitForFrames() {
+      const deadline = Date.now() + FRAME_TIMEOUT_MS;
+      while (Date.now() < deadline) {
+        if (video.videoWidth > 0 && video.readyState >= 2) return true;
+        await sleep(100);
+      }
+      return false;
+    }
+
+    // Attaches the stream to the preview and checks that frames arrive.
+    async function attachAndVerify(stream) {
+      video.srcObject = stream;
+      const playPromise = video.play();
+      if (playPromise && playPromise.catch) playPromise.catch(e => console.warn('video.play: ', e));
+      return waitForFrames();
+    }
+
+    function detachVideo() {
+      video.srcObject = null;
+    }
+
+    async function frontLabelConstraint() {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const front = devices.find(d => d.kind === 'videoinput' && d.deviceId && FRONT_LABEL_RE.test(d.label));
+        return front ? { deviceId: { exact: front.deviceId } } : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    // Opens and verifies the camera for one side using facingMode only
+    // (plus a labelled front camera as a last resort for 'user'). Returns { stream, facing }.
+    async function openSide(side) {
+      const attempts = [
+        () => ({ facingMode: { exact: side } }),
+        () => ({ facingMode: side })
+      ];
+      if (side === 'user') attempts.push(frontLabelConstraint);
+      let lastErr = new Error('no camera');
+      let previous = null;
+      for (const build of attempts) {
+        const constraint = await build();
+        if (!constraint) continue;
+        let stream = null;
+        try {
+          stream = await openCamera(constraint);
+          if (await attachAndVerify(stream)) {
+            const track = stream.getVideoTracks()[0];
+            const settings = track && track.getSettings ? track.getSettings() : {};
+            const facing = (settings.facingMode === 'user' || settings.facingMode === 'environment') ? settings.facingMode : side;
+            return { stream, facing };
+          }
+          console.warn('Camera produced no frames');
+          lastErr = new Error('no frames');
+          stopStream(stream);
+          detachVideo();
+        } catch (err) {
+          lastErr = err;
+          stopStream(stream);
+          detachVideo();
+          console.warn('getUserMedia failed:', err && err.name);
+          const name = err && err.name;
+          if (name === 'NotAllowedError' || name === 'SecurityError') break;
+          if (!(name === 'OverconstrainedError' || name === 'TypeError' || name === 'NotFoundError' || isBusyError(err))) break;
+        }
+      }
+      throw lastErr;
+    }
+
+    function renderCameraToast() {
+      const toast = document.getElementById('cameraToast');
+      if (!toast) return;
+      toast.textContent = translations[currentLang].switchCameraFail;
+      toast.classList.toggle('show', cameraToastVisible);
+    }
+
+    function showCameraToast() {
+      cameraToastVisible = true;
+      renderCameraToast();
+      clearTimeout(cameraToastTimer);
+      cameraToastTimer = setTimeout(() => {
+        cameraToastVisible = false;
+        renderCameraToast();
+      }, 3000);
+    }
+
+    function applyCameraStream(stream, facing) {
+      streamObj = stream;
+      currentFacingMode = facing;
+      video.classList.toggle('mirrored', facing === 'user');
+      stream.getVideoTracks().forEach(track => {
+        track.addEventListener('ended', () => {
+          if (streamObj === stream) {
+            stopCamera();
+            showCameraOverlay('ended');
+          }
+        });
+      });
+      hideCameraOverlay();
+    }
+
+    function stopCamera() {
+      const old = streamObj;
+      streamObj = null;
+      if (old) old.getTracks().forEach(track => track.stop());
+      video.srcObject = null;
+    }
+
+    function hasLiveStream() {
+      return !!streamObj && streamObj.getTracks().some(track => track.readyState === 'live');
+    }
+
+    function isPreviewingPhoto() {
+      return previewContainer.style.display === 'block';
+    }
+
+    function cameraErrorKind(err) {
+      const name = err && err.name;
+      if (name === 'NotAllowedError' || name === 'SecurityError') return 'denied';
+      if (name === 'NotReadableError' || name === 'AbortError') return 'busy';
+      if (name === 'NotFoundError' || name === 'OverconstrainedError' || name === 'DevicesNotFoundError') return 'notfound';
+      return 'error';
+    }
+
+    function showCameraOverlay(kind) {
+      cameraOverlayKind = kind;
+      renderCameraOverlay();
+    }
+
+    function hideCameraOverlay() {
+      cameraOverlayKind = null;
+      renderCameraOverlay();
+    }
+
+    function renderCameraOverlay() {
+      const overlay = document.getElementById('cameraOverlay');
+      if (!overlay) return;
+      if (!cameraOverlayKind) {
+        overlay.classList.remove('show');
+        return;
+      }
+      const t = translations[currentLang];
+      const ua = navigator.userAgent || '';
+      const platformSteps = /iPhone|iPad|iPod/i.test(ua) ? t.camStepsIos
+        : (/Android/i.test(ua) ? t.camStepsAndroid : t.camStepsDesktop);
+      const messages = {
+        prompt: [t.camMsgPrompt, ''],
+        denied: [t.camMsgDenied, platformSteps],
+        busy: [t.camMsgBusy, ''],
+        notfound: [t.camMsgNotFound, ''],
+        insecure: [t.camMsgInsecure, ''],
+        ended: [t.camMsgEnded, ''],
+        error: [t.camMsgError, '']
+      };
+      const [msg, steps] = messages[cameraOverlayKind] || messages.error;
+      document.getElementById('cameraOverlayMsg').textContent = msg;
+      document.getElementById('cameraOverlaySteps').textContent = steps;
+      document.getElementById('cameraOverlayBtn').textContent = cameraOverlayKind === 'prompt' ? t.camEnableBtn : t.camRetryBtn;
+      overlay.classList.add('show');
+    }
+
+    document.getElementById('cameraOverlayBtn').addEventListener('click', () => startCamera());
+
+    function cameraSupported() {
+      return window.isSecureContext !== false && !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    }
+
+    function cameraSectionActive() {
+      return cameraSection.classList.contains('active');
+    }
+
+    async function watchCameraPermission() {
+      if (cameraPermStatus || !navigator.permissions || !navigator.permissions.query) return;
+      try {
+        const status = await navigator.permissions.query({ name: 'camera' });
+        cameraPermStatus = status;
+        status.onchange = () => {
+          if (!cameraSectionActive() || cameraBusy) return;
+          if (status.state === 'granted') {
+            if (!hasLiveStream() && !isPreviewingPhoto() && !document.hidden) startCamera();
+          } else if (!isPreviewingPhoto()) {
+            stopCamera();
+            showCameraOverlay(status.state === 'denied' ? 'denied' : 'prompt');
+          }
+        };
+      } catch (e) {
+        // Safari/Firefox may not support the 'camera' permission name.
+      }
+    }
+
+    // Starts the camera without a user gesture only when that is likely to work.
+    async function autoStartCamera() {
+      if (!cameraSectionActive() || cameraBusy || document.hidden) return;
+      if (!cameraSupported()) {
+        showCameraOverlay('insecure');
+        return;
+      }
+      await watchCameraPermission();
+      const state = cameraPermStatus ? cameraPermStatus.state : null;
+      if (state === 'prompt') {
+        showCameraOverlay('prompt');
+      } else if (state === 'denied') {
+        showCameraOverlay('denied');
+      } else {
+        startCamera();
+      }
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        stopCamera();
+      } else if (cameraSectionActive() && !isPreviewingPhoto() && !hasLiveStream()) {
+        autoStartCamera();
+      }
+    });
+
+    window.addEventListener('pageshow', (e) => {
+      if (e.persisted && cameraSectionActive() && !isPreviewingPhoto() && !hasLiveStream()) autoStartCamera();
+    });
+
+    // Runs fn as the only camera operation. Returns false (and skips fn) if one is running.
+    async function withCameraLock(fn) {
+      if (cameraBusy) return false;
+      cameraBusy = true;
+      try {
+        await fn();
+      } finally {
+        cameraBusy = false;
+      }
+      return true;
+    }
+
+    switchCameraBtn.addEventListener('click', async () => {
+      if (cameraBusy) return;
+      const icon = switchCameraBtn.querySelector('i');
+      await withCameraLock(async () => {
+        switchCameraBtn.disabled = true;
+        icon.className = 'fa-solid fa-spinner fa-spin';
+        const previous = currentFacingMode;
+        const next = previous === 'environment' ? 'user' : 'environment';
+        try {
+          stopCamera();
+          await sleep(300);
+          try {
+            const result = await openSide(next);
+            applyCameraStream(result.stream, result.facing);
+          } catch (err) {
+            console.warn('Camera switch failed:', err && err.name, err);
+            showCameraToast();
+            stopCamera();
+            await sleep(300);
+            try {
+              const result = await openSide(previous);
+              applyCameraStream(result.stream, result.facing);
+            } catch (err2) {
+              console.warn('Camera restore failed:', err2 && err2.name, err2);
+              stopCamera();
+              showCameraOverlay(cameraErrorKind(err2));
+            }
+          }
+        } finally {
+          switchCameraBtn.disabled = false;
+          icon.className = 'fa-solid fa-camera-rotate';
+        }
+      });
+    });
+
+    async function startCamera() {
+      if (!cameraSupported()) {
+        showCameraOverlay('insecure');
+        return;
+      }
+      const ran = await withCameraLock(async () => {
+        try {
+          stopCamera();
+          const result = await openSide(currentFacingMode);
+          if (document.hidden || !cameraSectionActive()) {
+            stopStream(result.stream);
+            detachVideo();
+            return;
+          }
+          applyCameraStream(result.stream, result.facing);
+          refreshCameraSwitchSupport();
+        } catch (err) {
+          console.error("Eroare camera: ", err);
+          stopCamera();
+          showCameraOverlay(cameraErrorKind(err));
+        }
+      });
+      if (ran) watchCameraPermission();
+    }
+
+    captureBtn.addEventListener('click', () => {
+      clog('info', 'capture clicked');
+      if (!termsCheckbox.checked) {
+        notify(translations[currentLang].alertCheckboxError);
+        return;
+      }
+      if (!video.srcObject) return;
+
+      const ctx = canvas.getContext('2d');
+      const size = Math.min(video.videoWidth, video.videoHeight);
+      const startX = (video.videoWidth - size) / 2;
+      const startY = (video.videoHeight - size) / 2;
+      
+      ctx.drawImage(video, startX, startY, size, size, 0, 0, canvas.width, canvas.height);
+      const base64Image = canvas.toDataURL('image/jpeg', 0.85);
+      
+      capturedImage.src = base64Image;
+      previewContainer.style.display = 'block';
+      viewfinder.style.display = 'none';
+
+      captureBtn.style.display = 'none';
+      retakeBtn.style.display = 'flex';
+      confirmBtn.style.display = 'flex';
+      updateSwitchCameraVisibility();
+    });
+
+    retakeBtn.addEventListener('click', () => {
+      clog('info', `retake clicked inFlight=${typeof evaluateInFlight !== 'undefined' && evaluateInFlight}`);
+      if (typeof cancelEvaluate === 'function') cancelEvaluate('retake');
+      const t = translations[currentLang];
+      previewContainer.style.display = 'none';
+      viewfinder.style.display = 'block';
+      capturedImage.src = '';
+      resultCard.classList.remove('show');
+      lastResultData = null;
+      try { resetHospitalCard(); } catch (err) { clog('error', 'retake resetHospitalCard failed: ' + err); }
+      dbStatusBadge.innerText = '';
+
+      if (termsCheckbox.checked) {
+        captureBtn.removeAttribute('disabled');
+      } else {
+        captureBtn.setAttribute('disabled', 'true');
+      }
+
+      captureBtn.style.display = 'flex';
+      retakeBtn.style.display = 'none';
+      confirmBtn.style.display = 'none';
+      updateSwitchCameraVisibility();
+      confirmBtn.disabled = false;
+      confirmBtn.innerHTML = `<span id="confirmBtnText">${t.confirmBtn}</span> <i class="fa-solid fa-arrow-right"></i>`;
+      if (!hasLiveStream()) autoStartCamera();
+    });
+
+    // ---- Nearest hospital (OpenStreetMap + Leaflet, Overpass API) ----
+    // Coordinates stay in the browser: never logged or stored, and never sent to our server.
+    // Overpass receives them only to run the hospital query.
+    const hospitalCard = document.getElementById('hospitalCard');
+    const hospitalMapEl = document.getElementById('hospitalMap');
+    let hospitalState = { active: false, urgent: false, statusKey: '', hospital: null, distance: null };
+    let hospitalRunId = 0;
+    let hospitalMap = null;
+    let hospitalLayer = null;
+    const OVERPASS_ENDPOINTS = [
+      'https://overpass-api.de/api/interpreter',
+      'https://overpass.kumi.systems/api/interpreter',
+      'https://overpass.private.coffee/api/interpreter'
+    ];
+    const OVERPASS_TIMEOUT_MS = 20000;
+    const HOSPITAL_RADII_M = [10000, 50000];
+
+    function getPositionOnce(options) {
+      return new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          (err) => reject({ key: err.code === 1 ? 'hospitalDenied' : err.code === 3 ? 'hospitalTimeout' : 'hospitalUnavailable' }),
+          options
+        );
+      });
+    }
+
+    async function getUserPosition() {
+      if (!navigator.geolocation) throw { key: 'hospitalUnsupported' };
+      try {
+        return await getPositionOnce({ enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 });
+      } catch (e) {
+        if (e && e.key === 'hospitalDenied') throw e;
+        return await getPositionOnce({ enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+      }
+    }
+
+    function haversineMeters(a, b) {
+      const R = 6371000, rad = Math.PI / 180;
+      const dLat = (b.lat - a.lat) * rad, dLng = (b.lng - a.lng) * rad;
+      const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(h));
+    }
+
+    async function overpassQuery(query) {
+      for (const endpoint of OVERPASS_ENDPOINTS) {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), OVERPASS_TIMEOUT_MS);
+        try {
+          const r = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+            body: 'data=' + encodeURIComponent(query),
+            signal: ctrl.signal
+          });
+          if (!r.ok) { console.warn('Overpass mirror failed: HTTP ' + r.status); continue; }
+          const data = await r.json();
+          if (data && Array.isArray(data.elements)) return data.elements;
+          console.warn('Overpass mirror returned an unexpected response');
+        } catch (e) {
+          console.warn('Overpass mirror failed:', e && e.name ? e.name : 'error');
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+      throw { key: 'hospitalServiceError' };
+    }
+
+    async function findNearestHospital(pos) {
+      for (const radius of HOSPITAL_RADII_M) {
+        const query = `[out:json][timeout:20];(nwr["amenity"="hospital"](around:${radius},${pos.lat},${pos.lng});nwr["healthcare"="hospital"](around:${radius},${pos.lat},${pos.lng}););out center tags 50;`;
+        const elements = await overpassQuery(query);
+        let best = null;
+        for (const el of elements) {
+          const lat = el.lat != null ? el.lat : (el.center && el.center.lat);
+          const lng = el.lon != null ? el.lon : (el.center && el.center.lon);
+          if (typeof lat !== 'number' || typeof lng !== 'number') continue;
+          const d = haversineMeters(pos, { lat, lng });
+          if (!best || d < best.distance) best = { el, lat, lng, distance: d };
+        }
+        if (best) {
+          const tags = best.el.tags || {};
+          const street = [tags['addr:street'], tags['addr:housenumber']].filter(Boolean).join(' ');
+          const address = [street, tags['addr:city']].filter(Boolean).join(', ');
+          return { name: tags.name || '', address, lat: best.lat, lng: best.lng, distance: best.distance };
+        }
+      }
+      return null;
+    }
+
+    function renderHospitalCard() {
+      const t = translations[currentLang];
+      hospitalCard.classList.toggle('show', hospitalState.active);
+      hospitalCard.classList.toggle('urgent', hospitalState.urgent);
+      document.getElementById('hospitalTitle').textContent = t.hospitalTitle;
+      document.getElementById('hospitalUrgent').textContent = t.hospitalUrgent;
+      document.getElementById('hospitalStatus').textContent = hospitalState.statusKey ? t[hospitalState.statusKey] : '';
+      const h = hospitalState.hospital;
+      const dirEl = document.getElementById('hospitalDirections');
+      dirEl.textContent = t.hospitalDirections;
+      dirEl.style.display = h ? '' : 'none';
+      document.getElementById('hospitalName').textContent = h ? (h.name || t.hospitalUnnamed) : '';
+      document.getElementById('hospitalAddress').textContent = h ? h.address : '';
+      document.getElementById('hospitalDistance').textContent = (h && hospitalState.distance != null)
+        ? `${t.hospitalDistance}: ${hospitalState.distance >= 1000 ? (hospitalState.distance / 1000).toFixed(1) + ' km' : Math.round(hospitalState.distance) + ' m'}`
+        : '';
+      hospitalMapEl.classList.toggle('show', !!h || !!hospitalState.pos);
+      const hintEl = document.getElementById('hospitalMapHint');
+      hintEl.textContent = t.hospitalMapHint;
+      hintEl.classList.toggle('show', !!h || !!hospitalState.pos);
+    }
+
+    function hospitalDirectionsUrl(h) {
+      if (h) return 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(h.lat + ',' + h.lng);
+      return 'https://www.google.com/maps/search/?api=1&query=spital';
+    }
+
+    function openHospitalInGoogleMaps() {
+      clog('info', 'map tap \u2192 google maps');
+      window.open(hospitalDirectionsUrl(hospitalState.hospital), '_blank', 'noopener');
+    }
+
+    function resetHospitalCard() {
+      hospitalRunId++;
+      hospitalState = { active: false, urgent: false, statusKey: '', hospital: null, distance: null };
+      if (hospitalLayer) hospitalLayer.clearLayers();
+      renderHospitalCard();
+    }
+
+    function drawHospitalMap(pos, h) {
+      if (typeof L === 'undefined') throw { key: 'hospitalServiceError' };
+      if (!hospitalMap) {
+        hospitalMap = L.map(hospitalMapEl, { zoomControl: true });
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors'
+        }).addTo(hospitalMap);
+        hospitalLayer = L.layerGroup().addTo(hospitalMap);
+        hospitalMap.on('click', (ev) => {
+          const oe = ev.originalEvent;
+          const target = oe && oe.target;
+          if (target && target.closest && target.closest('.leaflet-control')) return;
+          openHospitalInGoogleMaps();
+        });
+      }
+      hospitalLayer.clearLayers();
+      // The map container is visible now (card and map are shown), so Leaflet can measure it.
+      hospitalMap.invalidateSize();
+      requestAnimationFrame(() => setTimeout(() => {
+        if (!hospitalMap) return;
+        hospitalMap.invalidateSize();
+        refitHospitalMap(pos, h);
+      }, 50));
+      const t = translations[currentLang];
+      L.circleMarker([pos.lat, pos.lng], { radius: 8, color: '#0d47a1', fillColor: '#1e88e5', fillOpacity: 1, weight: 2 }).addTo(hospitalLayer);
+      if (h) {
+        L.circleMarker([h.lat, h.lng], { radius: 10, color: '#b71c1c', fillColor: '#e53935', fillOpacity: 1, weight: 2, bubblingMouseEvents: false })
+          .bindTooltip(h.name || t.hospitalUnnamed, { permanent: true, direction: 'top' })
+          .on('click', openHospitalInGoogleMaps)
+          .addTo(hospitalLayer);
+      }
+      refitHospitalMap(pos, h);
+    }
+
+    function refitHospitalMap(pos, h) {
+      if (h) hospitalMap.fitBounds(L.latLngBounds([[pos.lat, pos.lng], [h.lat, h.lng]]), { padding: [40, 40], maxZoom: 16 });
+      else hospitalMap.setView([pos.lat, pos.lng], 14);
+    }
+
+    async function showNearestHospital(resData) {
+      const runId = ++hospitalRunId;
+      const jev = (resData && resData.jev_decision) || {};
+      hospitalState = { active: true, urgent: !!jev.requires_immediate_transfer, statusKey: '', hospital: null, distance: null };
+      renderHospitalCard();
+      const fail = (key) => {
+        if (runId !== hospitalRunId) return;
+        hospitalState.statusKey = key;
+        renderHospitalCard();
+      };
+      try {
+        const pos = await getUserPosition();
+        if (runId !== hospitalRunId) return;
+        hospitalState.pos = pos;
+        renderHospitalCard();
+        try { drawHospitalMap(pos, null); } catch (e) { /* map is optional */ }
+        let h;
+        try {
+          h = await findNearestHospital(pos);
+        } catch (e) {
+          if (runId !== hospitalRunId) return;
+          fail(e && e.key ? e.key : 'hospitalServiceError');
+          return;
+        }
+        if (runId !== hospitalRunId) return;
+        if (!h) { fail('hospitalNoResult'); return; }
+        hospitalState.hospital = h;
+        hospitalState.distance = h.distance;
+        hospitalState.statusKey = '';
+        renderHospitalCard();
+        document.getElementById('hospitalDirections').href = hospitalDirectionsUrl(h);
+        drawHospitalMap(pos, h);
+      } catch (e) {
+        if (e && e.key) fail(e.key);
+        else fail('hospitalServiceError');
+      }
+    }
+
+    function renderResults(resData) {
+      const t = translations[currentLang];
+      const jev = resData.jev_decision || {};
+      const cnn = resData.cnn_prediction || {};
+
+      // Render JEV outputs
+      jevDegree.innerText = t.classNames[jev.burn_degree_classification] || jev.burn_degree_classification || '-';
+      jevSeverity.innerText = jev.severity_probability_score ?? '-';
+      jevTransfer.innerText = jev.requires_immediate_transfer ? (currentLang === 'ro' ? "DA ⚠️" : "YES ⚠️") : (currentLang === 'ro' ? "NU ✓" : "NO ✓");
+
+      // Render false-positive warning (warn only)
+      const fpEl = document.getElementById('fpWarning');
+      fpEl.textContent = '';
+      if (jev.possible_false_positive || jev.no_burn_overridden) {
+        if (jev.possible_false_positive) {
+          const head = document.createElement('strong');
+          head.textContent = t.fpWarning;
+          fpEl.appendChild(head);
+        }
+        const codes = Array.isArray(jev.false_positive_reasons) ? jev.false_positive_reasons.slice() : [];
+        if (jev.no_burn_overridden) codes.unshift(jev.no_burn_override_reason || 'no_burn_insufficient_evidence');
+        const items = codes.map(c => (t.fpReasons && t.fpReasons[c]) || null).filter(Boolean);
+        if (items.length) {
+          const ul = document.createElement('ul');
+          items.forEach(txt => {
+            const li = document.createElement('li');
+            li.textContent = txt;
+            ul.appendChild(li);
+          });
+          fpEl.appendChild(ul);
+        }
+        fpEl.hidden = false;
+      } else {
+        fpEl.hidden = true;
+      }
+
+      // Render recommendation
+      const recEl = document.getElementById('recommendation');
+      const recKey = jev.recommendation;
+      const recText = currentLang === 'ro'
+        ? (jev.indicatii || (t.indicatii && t.indicatii[recKey]))
+        : (t.indicatii && t.indicatii[recKey]);
+      if (recKey && recText) {
+        recEl.className = 'recommendation ' + recKey;
+        recEl.textContent = recText;
+        recEl.hidden = false;
+      } else {
+        recEl.textContent = '';
+        recEl.hidden = true;
+      }
+
+      // Explain a "no burn" conclusion (only when that is the final class)
+      const noBurnNote = document.getElementById('noBurnNote');
+      if (jev.inconclusive) {
+        noBurnNote.textContent = jev.inconclusive_reason === 'answers_contradict_image' ? t.answersContradictNote : t.inconclusiveNote;
+        noBurnNote.hidden = false;
+      } else if (jev.answers_override && jev.burn_degree_classification === 'no_burn') {
+        noBurnNote.textContent = t.answersNoBurnNote;
+        noBurnNote.hidden = false;
+      } else if (jev.burn_degree_classification === 'no_burn') {
+        noBurnNote.textContent = t.noBurnConclusion;
+        noBurnNote.hidden = false;
+      } else {
+        noBurnNote.textContent = '';
+        noBurnNote.hidden = true;
+      }
+
+      // Render confidence (JEV first, then image model)
+      const confBlock = document.getElementById('confidenceBlock');
+      const jevConf = jev.classification_confidence;
+      const cnnConf = cnn.confidence;
+      let confVal = null, confSrc = '';
+      if (typeof jevConf === 'number' && isFinite(jevConf)) { confVal = jevConf; confSrc = t.confidenceSourceJev; }
+      else if (typeof cnnConf === 'number' && isFinite(cnnConf)) { confVal = cnnConf; confSrc = t.confidenceSourceModel; }
+      if (confVal === null) {
+        confBlock.hidden = true;
+      } else {
+        document.getElementById('confidenceLabel').textContent = t.confidenceLabel;
+        document.getElementById('confidenceValue').textContent = (confVal * 100).toFixed(1) + '%';
+        document.getElementById('confidenceSource').textContent = confSrc;
+        confBlock.hidden = false;
+      }
+
+      // Render CNN Probabilities Breakdown Bars if available
+      probList.innerHTML = '';
+      if (cnn.probabilities) {
+        for (const [rawClass, probVal] of Object.entries(cnn.probabilities)) {
+          const label = t.classNames[rawClass] || rawClass;
+          const percentage = (probVal * 100).toFixed(1);
+          probList.innerHTML += `
+            <div class="prob-row">
+              <div class="prob-label-row">
+                <span>${label}</span>
+                <strong>${percentage}%</strong>
+              </div>
+              <div class="prob-bar-bg">
+                <div class="prob-bar-fill" style="width: ${percentage}%"></div>
+              </div>
+            </div>
+          `;
+        }
+      }
+
+      resultCard.classList.add('show');
+    }
+
+    function getCanvasBlob() {
+      return new Promise((resolve) => {
+        try {
+          canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.85);
+        } catch (e) {
+          console.warn('toBlob failed:', e);
+          resolve(null);
+        }
+      });
+    }
+
+    async function dataUrlToBlob(dataUrl) {
+      const res = await fetch(dataUrl);
+      return await res.blob();
+    }
+
+    async function saveResultToSupabase(imageBase64, result) {
+      const t = translations[currentLang];
+      if (!currentUser) return;
+      dbStatusBadge.innerText = t.savingText;
+      try {
+        const cnn = result.cnn_prediction || {};
+        const jev = result.jev_decision || {};
+        const { error } = await _supabase.from(SUPABASE_RESULTS_TABLE).insert({
+          user_id: currentUser.id,
+          image_base64: imageBase64,
+          grad_arsura: jev.burn_degree_classification ?? cnn.predicted_class ?? null,
+          incredere: jev.classification_confidence ?? cnn.confidence ?? null
+        });
+        if (error) throw error;
+
+        dbStatusBadge.innerText = t.dbSavedBadge;
+      } catch (err) {
+        console.error("Supabase save error:", err);
+        dbStatusBadge.innerText = t.dbErrorBadge;
+      }
+    }
+
+    const EVALUATE_TIMEOUT_MS = 45000;
+    const PING_TIMEOUT_MS = 5000;
+    const BLOB_FALLBACK_TIMEOUT_MS = 5000;
+    const SUPABASE_SAVE_TIMEOUT_MS = 20000;
+    let evaluateInFlight = false;
+    let currentEval = null;
+    document.getElementById('appVersionLabel').textContent = 'v' + APP_VERSION;
+    console.warn('[app] version', APP_VERSION);
+
+    const cancelEvalBtn = document.getElementById('cancelEvalBtn');
+    const evalStatus = document.getElementById('evalStatus');
+
+    function resetConfirmBtn() {
+      const t = translations[currentLang];
+      confirmBtn.disabled = false;
+      confirmBtn.innerHTML = `<span id="confirmBtnText">${t.confirmBtn}</span> <i class="fa-solid fa-arrow-right"></i>`;
+    }
+
+    function setEvalStep(stepKey) {
+      const t = translations[currentLang];
+      console.warn('[evaluate] step:', stepKey);
+      clog('info', `step ${stepKey}`);
+      if (currentEval) currentEval.step = stepKey;
+      evalStatus.style.display = 'block';
+      evalStatus.textContent = t[stepKey];
+    }
+
+    function cancelEvaluate(reason) {
+      if (!currentEval || currentEval.ended) return;
+      console.warn('[evaluate] cancelled:', reason);
+      clog('info', `cancelEvaluate reason=${reason}`);
+      currentEval.ended = reason;
+      currentEval.controller.abort();
+      currentEval.rejectEnd(new Error(reason));
+    }
+
+    cancelEvalBtn.addEventListener('click', () => {
+      clog('info', 'cancel clicked');
+      cancelEvaluate('user');
+    });
+
+    function dataUrlToBlobSync(dataUrl) {
+      const m = /^data:([^;,]+)?(;base64)?,(.*)$/s.exec(dataUrl || '');
+      if (!m || !m[2]) return null;
+      const bin = atob(m[3]);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return new Blob([bytes], { type: 'image/jpeg' });
+    }
+
+    function canvasBlobWithTimeout() {
+      return Promise.race([
+        getCanvasBlob(),
+        new Promise((resolve) => setTimeout(() => resolve(null), BLOB_FALLBACK_TIMEOUT_MS))
+      ]);
+    }
+
+    async function getUploadBlob() {
+      try {
+        const direct = dataUrlToBlobSync(capturedImage.src);
+        if (direct && direct.size > 0) return direct;
+      } catch (e) {
+        console.warn('[evaluate] data URL decode failed:', e);
+        clog('error', `data URL decode failed: ${e && e.message}`);
+      }
+      console.warn('[evaluate] falling back to canvas.toBlob');
+      clog('warn', 'falling back to canvas.toBlob');
+      return await canvasBlobWithTimeout();
+    }
+
+    async function pingServer(signal) {
+      clog('info', 'ping start');
+      const pc = new AbortController();
+      const timer = setTimeout(() => pc.abort(), PING_TIMEOUT_MS);
+      const onAbort = () => pc.abort();
+      signal.addEventListener('abort', onAbort);
+      try {
+        const res = await fetch('/api/ping', { cache: 'no-store', signal: pc.signal });
+        clog('info', `ping result status=${res.status}`);
+        return res.ok;
+      } catch (e) {
+        console.warn('[evaluate] ping failed:', e);
+        clog('error', `ping failed: ${e && e.name}: ${e && e.message}`);
+        return false;
+      } finally {
+        clearTimeout(timer);
+        signal.removeEventListener('abort', onAbort);
+      }
+    }
+
+    function saveResultInBackground(imageSrc, result) {
+      const t = translations[currentLang];
+      let timer;
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Supabase save timeout')), SUPABASE_SAVE_TIMEOUT_MS);
+      });
+      Promise.race([saveResultToSupabase(imageSrc, result), timeout])
+        .catch((err) => {
+          console.warn('Supabase save failed:', err);
+          dbStatusBadge.innerText = t.dbErrorBadge;
+        })
+        .finally(() => clearTimeout(timer));
+    }
+
+    confirmBtn.addEventListener('click', async () => {
+      clog('info', `confirm clicked hasImage=${!!capturedImage.src} inFlight=${evaluateInFlight}`);
+      if (!capturedImage.src || evaluateInFlight) return;
+      evaluateInFlight = true;
+
+      const t = translations[currentLang];
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>${t.analyzingText}</span>`;
+      cancelEvalBtn.style.display = 'flex';
+      resultCard.classList.remove('show');
+      try { resetHospitalCard(); } catch (err) { clog('error', 'confirm resetHospitalCard failed: ' + err); }
+
+      const t0 = performance.now();
+      const ctx = { controller: new AbortController(), ended: null, step: null, rejectEnd: null };
+      const endPromise = new Promise((_, reject) => { ctx.rejectEnd = reject; });
+      endPromise.catch(() => {});
+      currentEval = ctx;
+      const deadlineTimer = setTimeout(() => {
+        if (ctx.ended) return;
+        console.warn(`[evaluate] overall deadline hit at step ${ctx.step}`);
+        ctx.ended = 'timeout';
+        ctx.controller.abort();
+        ctx.rejectEnd(new Error('timeout'));
+      }, EVALUATE_TIMEOUT_MS);
+      const questionnaire = {
+        "1. Care este cauza arsurii?": document.getElementById('q3_cause').value,
+        "2. Cât timp a durat expunerea la cauza arsurii?": document.getElementById('q0_exposure').value,
+        "3. Selectați gradul de durere resimțit la nivelul arsurii?": document.getElementById('q1_pain').value,
+        "4. Ce vârstă are persoana afectată?": document.getElementById('q_age').value,
+        "5. Este arsura într-o zonă periculoasă/sensibilă (palme, tălpi, față, gât, zona genitală)?": document.getElementById('q2_sensitive').value,
+        "6. Suprafața arsurii este mai mare de o palmă?": document.getElementById('q4_size').value,
+        "7. Există vezicule (bășici) mari?": document.getElementById('q5_blisters').value
+      };
+      const elapsed = () => Math.round(performance.now() - t0);
+
+      // Resolves to { result } on success, { alertMsg } on a handled failure, or {} when stopped.
+      const flow = async () => {
+        setEvalStep('stepPreparing');
+        const imageBlob = await getUploadBlob();
+        if (ctx.ended) return {};
+        if (!imageBlob) return { alertMsg: t.alertImageError };
+        console.warn(`[evaluate] image ready in ${elapsed()} ms (${imageBlob.size} bytes)`);
+        clog('info', `blob ready size=${imageBlob.size} in ${elapsed()}ms`);
+
+        setEvalStep('pingChecking');
+        const reachable = await pingServer(ctx.controller.signal);
+        if (ctx.ended) return {};
+        if (!reachable) return { alertMsg: t.alertServerUnreachable };
+
+        const formData = new FormData();
+        formData.append("file", imageBlob, "capture.jpg");
+        formData.append("questionnaire", JSON.stringify(questionnaire));
+
+        setEvalStep('stepSending');
+        let response;
+        clog('info', 'fetch start');
+        try {
+          response = await fetch(BACKEND_API_URL, {
+            method: 'POST',
+            body: formData,
+            signal: ctx.controller.signal
+          });
+        } catch (netErr) {
+          if (ctx.ended) return {};
+          console.warn(`[evaluate] network error after ${elapsed()} ms:`, netErr);
+          clog('error', `fetch error after ${elapsed()}ms: ${netErr && netErr.name}: ${netErr && netErr.message}`);
+          return { alertMsg: t.alertNetworkTimeout };
+        }
+        console.warn(`[evaluate] HTTP ${response.status} after ${elapsed()} ms`);
+        clog('info', `response status=${response.status} after ${elapsed()}ms`);
+        setEvalStep('stepAnalyzing');
+
+        if (!response.ok) {
+          let errBody = null;
+          try { errBody = await response.json(); } catch (_) {}
+          if (ctx.ended) return {};
+          const detail = errBody && errBody.detail;
+          if (response.status === 422 && detail && detail.code === 'low_brightness') {
+            return { alertMsg: t.alertLowBrightness };
+          }
+          console.warn('[evaluate] error body:', errBody);
+          return { alertMsg: `${t.alertMlError} (HTTP ${response.status})` };
+        }
+
+        let result;
+        try {
+          result = await response.json();
+        } catch (netErr) {
+          if (ctx.ended) return {};
+          console.warn('[evaluate] failed reading response body:', netErr);
+          return { alertMsg: t.alertNetworkTimeout };
+        }
+        return { result };
+      };
+
+      try {
+        const flowPromise = flow();
+        flowPromise.catch(() => {});
+        const out = await Promise.race([flowPromise, endPromise]);
+        if (ctx.ended) throw new Error(ctx.ended);
+        if (out.alertMsg) {
+          notify(out.alertMsg);
+        } else if (out.result) {
+          const result = out.result;
+          lastResultData = result;
+          renderResults(result);
+          if (result.jev_decision && result.jev_decision.requires_immediate_transfer) showNearestHospital(result);
+          console.warn(`[evaluate] done in ${elapsed()} ms`);
+          clog('info', `done in ${elapsed()}ms`);
+          saveResultInBackground(capturedImage.src, result);
+        }
+      } catch (err) {
+        if (ctx.ended === 'timeout') {
+          notify(t.alertNetworkTimeout);
+        } else if (ctx.ended) {
+          console.warn('[evaluate] stopped:', ctx.ended);
+        } else {
+          console.warn('[evaluate] unexpected error:', err);
+          notify(t.alertMlError);
+        }
+      } finally {
+        clog('info', `finally reached ended=${ctx.ended}`);
+        clearTimeout(deadlineTimer);
+        if (!ctx.ended) ctx.ended = 'done';
+        if (currentEval === ctx) currentEval = null;
+        evaluateInFlight = false;
+        cancelEvalBtn.style.display = 'none';
+        evalStatus.style.display = 'none';
+        evalStatus.textContent = '';
+        resetConfirmBtn();
+      }
+    });
+
+    window.addEventListener('load', async () => {
+      try { updateLanguage('ro'); } catch (err) { clog('error', 'updateLanguage failed: ' + err); }
+      const { data: { user } } = await _supabase.auth.getUser();
+      if (user) {
+        currentUser = user;
+        showCameraUI();
+      } else {
+        showAuthUI();
+      }
+    });
+  </script>
+  <script>
+    // --- Custom answer picker: replaces the native <select> popup; the hidden <select> stays the source of truth ---
+    (function () {
+      const picker = document.getElementById('optPicker');
+      const sheet = document.getElementById('optSheet');
+      const titleEl = document.getElementById('optSheetTitle');
+      const listEl = document.getElementById('optSheetList');
+      const closeBtn = document.getElementById('optSheetClose');
+      const selects = Array.from(document.querySelectorAll('.questionnaire-card select'));
+      let activeSelect = null;
+      let opener = null;
+      let historyPushed = false;
+
+      const questionText = (sel) => {
+        const label = document.querySelector('label[for="' + sel.id + '"]');
+        return label ? label.textContent : '';
+      };
+
+      function render() {
+        if (!activeSelect) return;
+        titleEl.textContent = questionText(activeSelect);
+        const focusedIndex = Array.from(listEl.children).findIndex((el) => el === document.activeElement);
+        listEl.textContent = '';
+        Array.from(activeSelect.options).forEach((opt, i) => {
+          const li = document.createElement('li');
+          li.setAttribute('role', 'presentation');
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'opt-sheet-option';
+          btn.setAttribute('role', 'option');
+          btn.dataset.index = String(i);
+          btn.setAttribute('aria-selected', i === activeSelect.selectedIndex ? 'true' : 'false');
+          btn.textContent = opt.textContent;
+          li.appendChild(btn);
+          listEl.appendChild(li);
+        });
+        if (focusedIndex >= 0) {
+          const again = listEl.querySelectorAll('.opt-sheet-option')[focusedIndex];
+          if (again) again.focus();
+        }
+      }
+
+      function optionButtons() { return Array.from(listEl.querySelectorAll('.opt-sheet-option')); }
+
+      function open(sel) {
+        if (activeSelect) return;
+        activeSelect = sel;
+        opener = sel;
+        render();
+        picker.hidden = false;
+        picker.classList.add('show');
+        try { history.pushState({ optPicker: true }, ''); historyPushed = true; } catch (e) { historyPushed = false; }
+        const current = optionButtons()[sel.selectedIndex] || optionButtons()[0];
+        if (current) {
+          current.focus();
+          if (current.scrollIntoView) current.scrollIntoView({ block: 'nearest' });
+        }
+      }
+
+      function close(fromPopstate) {
+        if (!activeSelect) return;
+        activeSelect = null;
+        picker.classList.remove('show');
+        picker.hidden = true;
+        if (historyPushed) {
+          historyPushed = false;
+          if (!fromPopstate) { try { history.back(); } catch (e) { /* ignore */ } }
+        }
+        if (opener) { try { opener.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
+        opener = null;
+      }
+
+      function choose(index) {
+        const sel = activeSelect;
+        if (!sel) return;
+        sel.selectedIndex = index;
+        sel.dispatchEvent(new Event('input', { bubbles: true }));
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+        close(false);
+      }
+
+      listEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('.opt-sheet-option');
+        if (btn) choose(Number(btn.dataset.index));
+      });
+      closeBtn.addEventListener('click', () => close(false));
+      picker.addEventListener('click', (e) => { if (e.target === picker) close(false); });
+      window.addEventListener('popstate', () => { if (activeSelect) close(true); });
+
+      picker.addEventListener('keydown', (e) => {
+        if (!activeSelect) return;
+        const btns = optionButtons();
+        const idx = btns.indexOf(document.activeElement);
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          close(false);
+        } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          const next = e.key === 'ArrowDown' ? Math.min(btns.length - 1, idx + 1) : Math.max(0, idx < 0 ? 0 : idx - 1);
+          if (btns[next]) btns[next].focus();
+        } else if (e.key === 'Home' || e.key === 'End') {
+          e.preventDefault();
+          const t = e.key === 'Home' ? btns[0] : btns[btns.length - 1];
+          if (t) t.focus();
+        } else if (e.key === 'Tab') {
+          // keep focus inside the dialog
+          const focusables = btns.concat([closeBtn]);
+          const pos = focusables.indexOf(document.activeElement);
+          if (e.shiftKey && pos <= 0) { e.preventDefault(); focusables[focusables.length - 1].focus(); }
+          else if (!e.shiftKey && pos === focusables.length - 1) { e.preventDefault(); focusables[0].focus(); }
+        }
+      });
+
+      selects.forEach((sel) => {
+        // Block the native popup, open the custom one.
+        sel.addEventListener('mousedown', (e) => { e.preventDefault(); });
+        sel.addEventListener('click', (e) => { e.preventDefault(); open(sel); });
+        let touchY = null;
+        sel.addEventListener('touchstart', (e) => { touchY = e.touches.length === 1 ? e.touches[0].clientY : null; }, { passive: true });
+        sel.addEventListener('touchend', (e) => {
+          const moved = touchY === null || (e.changedTouches[0] && Math.abs(e.changedTouches[0].clientY - touchY) > 10);
+          touchY = null;
+          if (!moved && e.cancelable) { e.preventDefault(); open(sel); }
+        });
+        sel.addEventListener('keydown', (e) => {
+          if (['Enter', ' ', 'ArrowDown', 'ArrowUp', 'F4'].includes(e.key)) {
+            e.preventDefault();
+            open(sel);
+          }
+        });
+      });
+
+      // Re-render texts when the language changes while the sheet is open.
+      window.refreshOptionPicker = render;
+    })();
+  </script>
+</body>
+</html>
